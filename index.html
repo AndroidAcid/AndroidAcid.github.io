@@ -132,22 +132,23 @@
             </ul>
           </div>
 
-          <div class="card">
-            <h3>Newsletter / updates</h3>
-            <form id="updatesForm" class="form">
-              <label class="label">
-                <span>Email</span>
-                <input required type="email" name="email" placeholder="acid@signals.net" />
-              </label>
-              <button class="btn" type="submit">Notify me</button>
-              <p class="muted tiny" id="updatesMsg" aria-live="polite"></p>
-            </form>
+           <div class="card notify-card">
+            <h3>Notify me</h3>
+            <p class="muted small">
+            </p>
+             
+            <button>
+              class="btn btn-notify"
+              onclick="window.open('https://forms.gle/GrSPi86cRuVY7dm58','_blank')"
+            </button>
+            <p class="muted tiny">
+            </p>
           </div>
         </div>
       </div>
     </section>
   </main>
-
+  
   <footer class="footer">
     <div class="wrap footer-inner">
       <div class="muted small">© <span id="year"></span> Android Acid</div>
