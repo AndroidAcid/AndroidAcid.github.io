@@ -114,44 +114,81 @@
       </div>
     </section>
 
-    <section id="contact" class="section">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>Contact</h2>
+    <section id="notify" class="section">
+      <header class="section-head">
+        <h2>Notify</h2>
+        <p>No email field here — the button opens your Google Form in a new window.</p>
+      </header>
+
+      <div class="card notify-card">
+        <div class="notify-left">
+          <h3>Get updates</h3>
+          <p class="muted">Releases, software drops, and studio logs.</p>
         </div>
 
-        <div class="contact-grid">
-          <div class="card">
-            <ul class="list">
-              <li><span class="k">SoundCloud</span> <a class="link" href="https://soundcloud.com/rgbelasco" target="_blank" rel="noreferrer">/rgbelasco</a></li>
-              <li><span class="k">GitHub</span> <a class="link" href="https://github.com/YOUR_USERNAME" target="_blank" rel="noreferrer">@AndroidAcid</a></li>
-            </ul>
-          </div>
-
-           <div class="card notify-card">
-            <p class="muted small">
-            </p>
-             
-            <button
-              class="btn btn-notify"           
-              onclick="window.open('https://forms.gle/GrSPi86cRuVY7dm58','_blank')">
-              E-mail / Contact
-            </button>
-            <p class="muted tiny">
-            </p>
-          </div>
+        <div class="notify-right">
+          <button id="notifyBtn2" class="btn menace" type="button">
+            <span class="btn-text" id="notifyBtnText2">Open Notify Form</span>
+            <span class="led-bank" aria-hidden="true">
+              <span class="led l1"></span>
+              <span class="led l2"></span>
+              <span class="led l3"></span>
+              <span class="led l4"></span>
+            </span>
+          </button>
         </div>
       </div>
     </section>
   </main>
-  
+
   <footer class="footer">
-    <div class="wrap footer-inner">
-      <div class="muted small">© <span id="year"></span> Android Acid</div>
-      <div class="muted small">Built for GitHub Pages • Neon responsibly</div>
-    </div>
+    <span>© <span id="year"></span> android acid</span>
+    <span class="muted">Built for GitHub Pages.</span>
   </footer>
 
-  <script src="assets/app.js"></script>
+  <script>
+    // ====== CONFIG ======
+    const FORM_URL = "https://forms.gle/GrSPi86cRuVY7dm58";
+
+    // If you want to change button text, edit these:
+    const BUTTON_TEXT_HERO = "Notify Me";
+    const BUTTON_TEXT_SECTION = "Open Notify Form";
+
+    // ====== WIRING ======
+    const yearEl = document.getElementById("year");
+    yearEl.textContent = new Date().getFullYear();
+
+    // Set text labels
+    document.getElementById("notifyBtnText").textContent = BUTTON_TEXT_HERO;
+    document.getElementById("notifyBtnText2").textContent = BUTTON_TEXT_SECTION;
+
+    // Open Google Form in a separate window/tab
+    function openForm() {
+      window.open(FORM_URL, "_blank", "noopener,noreferrer");
+    }
+
+    document.getElementById("notifyBtn").addEventListener("click", openForm);
+    document.getElementById("notifyBtn2").addEventListener("click", openForm);
+
+    // ====== MENACE: meter movement + occasional LED chaos ======
+    const meter = document.getElementById("meterBar");
+
+    function tickMeter() {
+      // A “menacing” but subtle motion
+      const v = 30 + Math.random() * 70; // 30–100%
+      meter.style.width = v.toFixed(0) + "%";
+      meter.style.filter = `brightness(${1 + Math.random() * 0.8})`;
+    }
+
+    setInterval(tickMeter, 350);
+
+    // Randomize LED flicker speed per bank
+    const banks = document.querySelectorAll(".led-bank");
+    banks.forEach((bank) => {
+      const speed = 0.6 + Math.random() * 1.4; // seconds
+      bank.style.setProperty("--blink-speed", speed.toFixed(2) + "s");
+      bank.style.setProperty("--blink-chaos", (0.75 + Math.random() * 0.8).toFixed(2));
+    });
+  </script>
 </body>
 </html>
