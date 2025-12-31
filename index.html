@@ -3,114 +3,211 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#00ff66" />
-  <meta name="description" content="Android Acid — Acid, Synths, and Software." />
-
-  <title>Android Acid</title>
-
-  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="assets/style.css" />
+  <title>android acid</title>
+  <meta name="description" content="android acid — music, audio software, and studio photos." />
+  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
-  <a class="skip" href="#content">Skip to content</a>
+  <div class="scanlines" aria-hidden="true"></div>
 
-  <header class="site-header">
-    <div class="wrap header-inner">
-      <div class="brand">
-        <!-- Replace assets/logo.svg with your exact logo if you want -->
-        <img class="logo" src="assets/logo.svg" alt="Android Acid logo" />
-        <div class="brand-text">
-          <div class="brand-title">ANDROID ACID</div>
-          <div class="brand-sub">Acid • Synths • Software</div>
-        </div>
-      </div>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="android acid home">
+      <!-- 303-ish vector mark -->
+      <svg class="brand-mark" viewBox="0 0 260 80" role="img" aria-label="android acid 303 mark">
+        <defs>
+          <linearGradient id="aaGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#ff7a18"/>
+            <stop offset="0.6" stop-color="#ff4d00"/>
+            <stop offset="1" stop-color="#ffb000"/>
+          </linearGradient>
+        </defs>
 
-      <nav class="nav">
-        <a href="#music">Music</a>
-        <a href="#software">Software</a>
-        <a href="#studio">Studio</a>
-        <a href="#contact">Contact</a>
-      </nav>
+        <!-- body -->
+        <path d="M22 18c0-6 4-10 10-10h170c6 0 12 3 16 7l16 16c4 4 4 10 0 14L228 64c-4 4-10 8-16 8H32c-6 0-10-4-10-10V18z"
+              fill="none" stroke="url(#aaGrad)" stroke-width="4" />
+        <!-- knobs/steps -->
+        <circle cx="58" cy="34" r="6" fill="url(#aaGrad)"/>
+        <circle cx="82" cy="34" r="6" fill="url(#aaGrad)"/>
+        <circle cx="106" cy="34" r="6" fill="url(#aaGrad)"/>
 
-      <button class="menu-btn" aria-label="Open menu" aria-expanded="false">
-        <span></span><span></span><span></span>
-      </button>
-    </div>
+        <rect x="56" y="50" width="130" height="10" rx="5" fill="url(#aaGrad)" opacity="0.85"/>
+        <rect x="196" y="26" width="28" height="28" rx="6" fill="none" stroke="url(#aaGrad)" stroke-width="3"/>
+
+        <!-- little "led" dots in logo -->
+        <circle cx="206" cy="38" r="3" fill="#ffb000"/>
+        <circle cx="216" cy="38" r="3" fill="#ff7a18" opacity="0.9"/>
+        <circle cx="206" cy="48" r="3" fill="#ff4d00" opacity="0.9"/>
+        <circle cx="216" cy="48" r="3" fill="#ffb000" opacity="0.9"/>
+      </svg>
+
+      <span class="brand-text">
+        <span class="brand-name">android acid</span>
+        <span class="brand-tag">music • audio software • studio</span>
+      </span>
+    </a>
+
+    <nav class="nav">
+      <a href="#music">Music</a>
+      <a href="#software">Software</a>
+      <a href="#studio">Studio</a>
+      <a href="#notify">Notify</a>
+    </nav>
   </header>
 
-  <main id="content">
+  <main id="top">
     <section class="hero">
-      <div class="wrap hero-grid">
-        <div class="hero-copy">
-          <h1 class="glow">Acid, noise, and machines that argue back.</h1>
-          <p class="muted">
-            Welcome to <strong>Android Acid</strong>. This is my home for releases, weird little audio tools,
-            and photos from the studio.
-          </p>
-          
-        <div class="chips" aria-label="tags">
-            <a class="btn" href="#music">Music</a>
-            <a class="btn" href="#software">Software</a>
-            <a class="btn" href="#studio">Studio</a>
-            <a class="btn" href="#contact">Contact</a>
-          </div>
+      <div class="hero-copy">
+        <h1 class="glitch" data-text="android acid">android acid</h1>
+        <p class="subhead">
+          Acid lines, hardware grit, and software toys — straight from the lab.
+        </p>
+
+        <div class="cta-row">
+          <a class="btn ghost" href="#music">Listen</a>
+
+          <!-- Notify button (opens Google Form in new tab/window) -->
+          <button
+            id="notifyBtn"
+            class="btn menace"
+            type="button"
+            aria-label="Open notify form"
+          >
+            <span class="btn-text" id="notifyBtnText">Notify Me</span>
+
+            <!-- LED cluster -->
+            <span class="led-bank" aria-hidden="true">
+              <span class="led l1"></span>
+              <span class="led l2"></span>
+              <span class="led l3"></span>
+              <span class="led l4"></span>
+            </span>
+          </button>
         </div>
 
-        <div class="hero-card">
-          <div class="panel">
-            <div class="panel-top">
-              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-              <span class="panel-title">v1.0</span>
-            </div>
-            <div class="panel-body">
-              <div class="meter">
-                <div class="meter-bar" style="--w: 88%"></div>
-                <div class="meter-bar" style="--w: 63%"></div>
-                <div class="meter-bar" style="--w: 74%"></div>
-                <div class="meter-bar" style="--w: 49%"></div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <p class="fineprint">
+          Hosted on GitHub Pages. No trackers. Just vibes and voltage.
+        </p>
       </div>
 
-      <div class="hero-scanline" aria-hidden="true"></div>
+      <div class="hero-panel" aria-hidden="true">
+        <div class="panel-title">303 MENACE</div>
+        <div class="panel-meter">
+          <div class="meter-bar" id="meterBar"></div>
+        </div>
+        <div class="panel-grid">
+          <div class="chip">ACCENT</div>
+          <div class="chip">SLIDE</div>
+          <div class="chip">RES</div>
+          <div class="chip">CUTOFF</div>
+          <div class="chip">ENV</div>
+          <div class="chip">DRIVE</div>
+        </div>
+      </div>
     </section>
 
     <section id="music" class="section">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>Music</h2>
-        </div>
+      <header class="section-head">
+        <h2>Music</h2>
+        <p>SoundCloud embeds, releases, live sets — whatever you want to highlight.</p>
+      </header>
 
-        <div id="musicGrid" class="grid"></div>
+      <div class="grid two">
+        <article class="card">
+          <h3>Featured Set</h3>
+          <div class="embed">
+            <!-- Replace with your SoundCloud embed(s) -->
+            <iframe
+              title="SoundCloud player"
+              width="100%"
+              height="166"
+              scrolling="no"
+              frameborder="no"
+              allow="autoplay"
+              src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/rgbelasco&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"
+            ></iframe>
+          </div>
+          <p class="muted">Swap in track/playlist URLs anytime.</p>
+        </article>
 
-        <div class="links-row">
-          <a class="link" href="https://soundcloud.com/rgbelasco" target="_blank" rel="noreferrer">SoundCloud</a>
-          <span class="sep">•</span>
-          <a class="link" href="#contact">Bookings / collabs</a>
-        </div>
+        <article class="card">
+          <h3>Latest Release</h3>
+          <div class="embed">
+            <iframe
+              title="SoundCloud player 2"
+              width="100%"
+              height="166"
+              scrolling="no"
+              frameborder="no"
+              allow="autoplay"
+              src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/rgbelasco&color=%23ff5500&auto_play=false"
+            ></iframe>
+          </div>
+          <p class="muted">Use this slot for a single track you’re pushing.</p>
+        </article>
       </div>
     </section>
 
     <section id="software" class="section">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>Audio software</h2>
-        </div>
+      <header class="section-head">
+        <h2>Audio Software</h2>
+        <p>Plugins, patches, tools, weird little DSP experiments.</p>
+      </header>
 
-        <div id="softwareGrid" class="grid"></div>
+      <div class="grid three">
+        <article class="card">
+          <h3>Tool / Plugin #1</h3>
+          <p class="muted">Short description. What it does. Why it rules.</p>
+          <div class="card-actions">
+            <a class="btn small ghost" href="#" target="_blank" rel="noopener">Demo</a>
+            <a class="btn small" href="#" target="_blank" rel="noopener">Download</a>
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>Tool / Plugin #2</h3>
+          <p class="muted">Short description. Maybe a screenshot later.</p>
+          <div class="card-actions">
+            <a class="btn small ghost" href="#" target="_blank" rel="noopener">Docs</a>
+            <a class="btn small" href="#" target="_blank" rel="noopener">Get it</a>
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>Max / Pd / Ableton Rack</h3>
+          <p class="muted">Put your favorite build here.</p>
+          <div class="card-actions">
+            <a class="btn small ghost" href="#" target="_blank" rel="noopener">Video</a>
+            <a class="btn small" href="#" target="_blank" rel="noopener">Download</a>
+          </div>
+        </article>
       </div>
     </section>
 
     <section id="studio" class="section">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>Studio</h2>
-        </div>
+      <header class="section-head">
+        <h2>Studio</h2>
+        <p>Drop photos into <code>/assets/studio/</code> and update the paths.</p>
+      </header>
 
-        <div id="gallery" class="gallery"></div>
+      <div class="grid gallery">
+        <!-- Replace these with your real images -->
+        <figure class="shot">
+          <img src="assets/studio/shot1.jpg" alt="Studio photo 1" loading="lazy" />
+          <figcaption>Rack + interface</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="assets/studio/shot2.jpg" alt="Studio photo 2" loading="lazy" />
+          <figcaption>303 corner</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="assets/studio/shot3.jpg" alt="Studio photo 3" loading="lazy" />
+          <figcaption>Workstation</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="assets/studio/shot4.jpg" alt="Studio photo 4" loading="lazy" />
+          <figcaption>Patch bay chaos</figcaption>
+        </figure>
       </div>
     </section>
 
