@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#00ff66" />
+  <meta name="description" content="Android Acid — Acid, Synths, and Software." />
+
+  <title>Android Acid</title>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <div class="brand">
+        <!-- Replace assets/logo.svg with your exact logo if you want -->
+        <img class="logo" src="assets/logo.svg" alt="Android Acid logo" />
+        <div class="brand-text">
+          <div class="brand-title">ANDROID ACID</div>
+          <div class="brand-sub">Acid • Synths • Software</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a href="#music">Music</a>
+        <a href="#software">Software</a>
+        <a href="#studio">Studio</a>
+        <a href="#contact">Contact</a>
+      </nav>
+
+      <button class="menu-btn" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="content">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <h1 class="glow">Acid, noise, and machines that argue back.</h1>
+          <p class="muted">
+            Welcome to <strong>Android Acid</strong>. This is my home for releases, weird little audio tools,
+            and photos from the studio.
+          </p>
+          
+        <div class="chips" aria-label="tags">
+            <a class="btn" href="#music">Music</a>
+            <a class="btn" href="#software">Software</a>
+            <a class="btn" href="#studio">Studio</a>
+            <a class="btn" href="#contact">Contact</a>
+          </div>
+        </div>
+
+        <div class="hero-card">
+          <div class="panel">
+            <div class="panel-top">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              <span class="panel-title">v1.0</span>
+            </div>
+            <div class="panel-body">
+              <div class="meter">
+                <div class="meter-bar" style="--w: 88%"></div>
+                <div class="meter-bar" style="--w: 63%"></div>
+                <div class="meter-bar" style="--w: 74%"></div>
+                <div class="meter-bar" style="--w: 49%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-scanline" aria-hidden="true"></div>
+    </section>
+
+    <section id="music" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Music</h2>
+        </div>
+
+        <div id="musicGrid" class="grid"></div>
+
+        <div class="links-row">
+          <a class="link" href="https://soundcloud.com/rgbelasco" target="_blank" rel="noreferrer">SoundCloud</a>
+          <span class="sep">•</span>
+          <a class="link" href="#contact">Bookings / collabs</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="software" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Audio software</h2>
+        </div>
+
+        <div id="softwareGrid" class="grid"></div>
+      </div>
+    </section>
+
+    <section id="studio" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Studio</h2>
+        </div>
+
+        <div id="gallery" class="gallery"></div>
+      </div>
+    </section>
+
+    <section id="contact" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Contact</h2>
+        </div>
+
+        <div class="contact-grid">
+          <div class="card">
+            <h3>Reach me</h3>
+            <p class="muted">For releases, licensing, collabs, and audio tool questions.</p>
+
+            <ul class="list">
+              <li><span class="k">Email</span> <a class="link" href="mailto:you@domain.com">you@domain.com</a></li>
+              <li><span class="k">SoundCloud</span> <a class="link" href="https://soundcloud.com/rgbelasco" target="_blank" rel="noreferrer">/rgbelasco</a></li>
+              <li><span class="k">GitHub</span> <a class="link" href="https://github.com/YOUR_USERNAME" target="_blank" rel="noreferrer">@YOUR_USERNAME</a></li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>Newsletter / updates</h3>
+            <form id="updatesForm" class="form">
+              <label class="label">
+                <span>Email</span>
+                <input required type="email" name="email" placeholder="acid@signals.net" />
+              </label>
+              <button class="btn" type="submit">Notify me</button>
+              <p class="muted tiny" id="updatesMsg" aria-live="polite"></p>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="muted small">© <span id="year"></span> Android Acid</div>
+      <div class="muted small">Built for GitHub Pages • Neon responsibly</div>
+    </div>
+  </footer>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>
