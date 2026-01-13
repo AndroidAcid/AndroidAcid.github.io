@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pomodoro Timer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0f14;
+      --panel: rgba(255,255,255,0.06);
+      --panel-2: rgba(255,255,255,0.10);
+      --text: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.65);
+      --accent: #7c5cff;
+      --accent-2: #00d1b2;
+      --danger: #ff4d6d;
+      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+      --ring: 0 0 0 3px rgba(124, 92, 255, 0.25);
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+
+    [data-theme="light"] {
+      color-scheme: light;
+      --bg: #f6f7fb;
+      --panel: rgba(0,0,0,0.05);
+      --panel-2: rgba(0,0,0,0.08);
+      --text: rgba(0,0,0,0.88);
+      --muted: rgba(0,0,0,0.60);
+      --shadow: 0 10px 30px rgba(0,0,0,0.12);
+      --ring: 0 0 0 3px rgba(124, 92, 255, 0.20);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(1200px 600px at 20% 10%, rgba(124,92,255,0.22), transparent 60%),
+                  radial-gradient(900px 500px at 80% 20%, rgba(0,209,178,0.18), transparent 55%),
+                  radial-gradient(700px 450px at 50% 90%, rgba(255,77,109,0.14), transparent 60%),
+                  var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+    }
+
+    .app {
+      width: min(520px, calc(100vw - 32px));
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--panel-2);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .title {
+      display: grid;
+      gap: 4px;
+    }
+    .title h1 {
+      font-size: 18px;
+      margin: 0;
+      letter-spacing: 0.2px;
+    }
+    .title p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--panel-2);
+      background: rgba(255,255,255,0.03);
+      padding: 8px 10px;
+      border-radius: 999px;
+    }
+
+    .pill button {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 999px;
+    }
+    .pill button:focus-visible { outline: none; box-shadow: var(--ring); }
+    .pill button[aria-pressed="true"] {
+      background: rgba(124,92,255,0.18);
+      border: 1px solid rgba(124,92,255,0.35);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-top: 10px;
+    }
+
+    .timerCard {
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--panel-2);
+      background: rgba(255,255,255,0.03);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ring {
+      width: 270px;
+      height: 270px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      position: relative;
+      background:
+        radial-gradient(circle at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0) 61%),
+        conic-gradient(var(--accent) var(--p, 0deg), rgba(255,255,255,0.07) 0);
+      box-shadow: inset 0 0 0 1px var(--panel-2);
+    }
+
+    .ring::after {
+      content: "";
+      position: absolute;
+      inset: 14px;
+      border-radius: inherit;
+      background: rgba(0,0,0,0.12);
+      border: 1px solid var(--panel-2);
+      backdrop-filter: blur(10px);
+    }
+
+    .center {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      gap: 6px;
+      text-align: center;
+      padding: 10px;
+    }
+
+    .mode {
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .time {
+      font-family: var(--mono);
+      font-size: 54px;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      margin: 0;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+      width: min(420px, 100%);
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--panel-2);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      padding: 12px 12px;
+      border-radius: 14px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      transition: transform .06s ease, background .15s ease, border-color .15s ease;
+    }
+    .btn:hover { background: rgba(255,255,255,0.07); }
+    .btn:active { transform: translateY(1px); }
+    .btn:focus-visible { outline: none; box-shadow: var(--ring); }
+
+    .btn.primary {
+      background: rgba(124,92,255,0.18);
+      border-color: rgba(124,92,255,0.38);
+    }
+    .btn.primary:hover { background: rgba(124,92,255,0.24); }
+
+    .btn.danger {
+      background: rgba(255,77,109,0.12);
+      border-color: rgba(255,77,109,0.35);
+    }
+    .btn.danger:hover { background: rgba(255,77,109,0.18); }
+
+    .settings {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--panel-2);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 110px 110px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 10px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--panel-2);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-family: var(--mono);
+    }
+    input[type="number"]:focus-visible { outline: none; box-shadow: var(--ring); }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    .footer {
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .toggle {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--panel-2);
+      background: rgba(255,255,255,0.03);
+      user-select: none;
+    }
+
+    .switch {
+      width: 44px;
+      height: 26px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.10);
+      border: 1px solid var(--panel-2);
+      position: relative;
+      cursor: pointer;
+    }
+    .knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.85);
+      transition: transform .18s ease;
+    }
+    [data-theme="dark"] .knob { transform: translateX(18px); background: rgba(255,255,255,0.90); }
+    [data-theme="light"] .knob { transform: translateX(0px); }
+
+    @media (max-width: 420px) {
+      .ring { width: 240px; height: 240px; }
+      .time { font-size: 46px; }
+      .row { grid-template-columns: 1fr 1fr; }
+      .row label { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+
+<body data-theme="dark">
+  <main class="app" role="application" aria-label="Pomodoro timer">
+    <header>
+      <div class="title">
+        <h1>Pomodoro Timer</h1>
+        <p>Focus, then rest. Repeat until you’re unstoppable (or at least done).</p>
+      </div>
+
+      <div class="pill" aria-label="Mode selector">
+        <button id="focusBtn" aria-pressed="true" title="Focus">Focus</button>
+        <button id="shortBtn" aria-pressed="false" title="Short break">Short</button>
+        <button id="longBtn" aria-pressed="false" title="Long break">Long</button>
+      </div>
+    </header>
+
+    <section class="grid">
+      <div class="timerCard">
+        <div class="ring" id="ring">
+          <div class="center">
+            <div class="mode" id="modeLabel">Focus</div>
+            <p class="time" id="time">25:00</p>
+            <p class="hint" id="hint">Press Start • Space to pause/resume</p>
+
+            <div class="controls">
+              <button class="btn primary" id="startPause">Start</button>
+              <button class="btn" id="skip">Skip</button>
+              <button class="btn danger" id="reset">Reset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings" aria-label="Settings">
+        <div class="row">
+          <label for="focusMins">Focus (minutes)</label>
+          <input id="focusMins" type="number" min="1" max="180" value="25" />
+          <button class="btn" id="apply">Apply</button>
+        </div>
+        <div class="row">
+          <label for="shortMins">Short break (minutes)</label>
+          <input id="shortMins" type="number" min="1" max="60" value="5" />
+          <button class="btn" id="save" title="Save settings">Save</button>
+        </div>
+        <div class="row">
+          <label for="longMins">Long break (minutes)</label>
+          <input id="longMins" type="number" min="1" max="120" value="15" />
+          <div></div>
+        </div>
+        <p class="small">
+          Defaults to: 4 focus sessions → long break. Settings persist in your browser (no accounts, no drama).
+        </p>
+
+        <div class="footer">
+          <div class="small" id="sessionInfo">Session: 1 / 4</div>
+
+          <div class="toggle" title="Toggle theme">
+            <span class="small" style="margin:0">Theme</span>
+            <div class="switch" id="themeSwitch" role="switch" aria-checked="true" tabindex="0">
+              <div class="knob"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // --- Pomodoro logic (no frameworks) ---
+    const els = {
+      time: document.getElementById("time"),
+      modeLabel: document.getElementById("modeLabel"),
+      hint: document.getElementById("hint"),
+      ring: document.getElementById("ring"),
+      startPause: document.getElementById("startPause"),
+      reset: document.getElementById("reset"),
+      skip: document.getElementById("skip"),
+      focusBtn: document.getElementById("focusBtn"),
+      shortBtn: document.getElementById("shortBtn"),
+      longBtn: document.getElementById("longBtn"),
+      focusMins: document.getElementById("focusMins"),
+      shortMins: document.getElementById("shortMins"),
+      longMins: document.getElementById("longMins"),
+      apply: document.getElementById("apply"),
+      save: document.getElementById("save"),
+      sessionInfo: document.getElementById("sessionInfo"),
+      themeSwitch: document.getElementById("themeSwitch"),
+      body: document.body
+    };
+
+    const STORAGE_KEY = "pomo_settings_v1";
+    const THEME_KEY = "pomo_theme_v1";
+
+    // 4 focus sessions then long break (classic)
+    const cycleLength = 4;
+
+    const state = {
+      mode: "focus", // focus | short | long
+      isRunning: false,
+      intervalId: null,
+      remainingMs: 25 * 60 * 1000,
+      totalMs: 25 * 60 * 1000,
+      focusCount: 0, // completed focus sessions
+      settings: {
+        focus: 25,
+        short: 5,
+        long: 15
+      }
+    };
+
+    function pad(n) { return String(n).padStart(2, "0"); }
+
+    function format(ms) {
+      const totalSec = Math.max(0, Math.round(ms / 1000));
+      const m = Math.floor(totalSec / 60);
+      const s = totalSec % 60;
+      return `${pad(m)}:${pad(s)}`;
+    }
+
+    function setPressed(btn) {
+      [els.focusBtn, els.shortBtn, els.longBtn].forEach(b => b.setAttribute("aria-pressed", "false"));
+      btn.setAttribute("aria-pressed", "true");
+    }
+
+    function setMode(mode, { keepRunning = false } = {}) {
+      state.mode = mode;
+
+      // Stop if switching modes while running (unless explicitly kept)
+      if (state.isRunning && !keepRunning) pause();
+
+      const mins = state.settings[mode];
+      state.totalMs = mins * 60 * 1000;
+      state.remainingMs = state.totalMs;
+
+      els.modeLabel.textContent = mode === "focus" ? "Focus" : mode === "short" ? "Short Break" : "Long Break";
+      els.hint.textContent = state.isRunning ? "Running • Space to pause/resume" : "Press Start • Space to pause/resume";
+      els.time.textContent = format(state.remainingMs);
+      updateRing();
+
+      if (mode === "focus") setPressed(els.focusBtn);
+      if (mode === "short") setPressed(els.shortBtn);
+      if (mode === "long") setPressed(els.longBtn);
+
+      updateTitle();
+    }
+
+    function updateRing() {
+      const pct = state.totalMs ? (1 - state.remainingMs / state.totalMs) : 0;
+      const deg = Math.max(0, Math.min(360, pct * 360));
+      els.ring.style.setProperty("--p", `${deg}deg`);
+    }
+
+    function updateTitle() {
+      const label = els.modeLabel.textContent;
+      document.title = `${els.time.textContent} • ${label}`;
+    }
+
+    function tick() {
+      state.remainingMs -= 1000;
+      if (state.remainingMs <= 0) {
+        state.remainingMs = 0;
+        render();
+        onDone();
+        return;
+      }
+      render();
+    }
+
+    function render() {
+      els.time.textContent = format(state.remainingMs);
+      updateRing();
+      updateTitle();
+    }
+
+    function start() {
+      if (state.isRunning) return;
+      state.isRunning = true;
+      els.startPause.textContent = "Pause";
+      els.hint.textContent = "Running • Space to pause/resume";
+
+      // Keep time accurate-ish by aligning to seconds
+      const startAt = Date.now();
+      let last = startAt;
+
+      state.intervalId = setInterval(() => {
+        const now = Date.now();
+        const elapsed = now - last;
+        if (elapsed >= 1000) {
+          const steps = Math.floor(elapsed / 1000);
+          last += steps * 1000;
+          state.remainingMs -= steps * 1000;
+          if (state.remainingMs <= 0) {
+            state.remainingMs = 0;
+            render();
+            onDone();
+            return;
+          }
+          render();
+        }
+      }, 200);
+    }
+
+    function pause() {
+      state.isRunning = false;
+      els.startPause.textContent = "Start";
+      els.hint.textContent = "Paused • Space to resume";
+      clearInterval(state.intervalId);
+      state.intervalId = null;
+    }
+
+    function reset() {
+      pause();
+      const mins = state.settings[state.mode];
+      state.totalMs = mins * 60 * 1000;
+      state.remainingMs = state.totalMs;
+      els.hint.textContent = "Press Start • Space to pause/resume";
+      render();
+    }
+
+    function beep() {
+      // Simple WebAudio beep (no file needed)
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      const ctx = new AudioCtx();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = 880;
+      g.gain.value = 0.0001;
+
+      o.connect(g);
+      g.connect(ctx.destination);
+
+      const t = ctx.currentTime;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.15, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+
+      o.start(t);
+      o.stop(t + 0.65);
+
+      o.onended = () => ctx.close?.();
+    }
+
+    function onDone() {
+      pause();
+      beep();
+
+      // Browser notification (optional / best-effort)
+      if ("Notification" in window) {
+        if (Notification.permission === "granted") {
+          new Notification("Pomodoro done!", { body: `${els.modeLabel.textContent} finished.` });
+        }
+      }
+
+      // Auto-advance: focus -> (short/long), break -> focus
+      if (state.mode === "focus") {
+        state.focusCount += 1;
+
+        const isLong = (state.focusCount % cycleLength === 0);
+        els.sessionInfo.textContent = `Session: ${(state.focusCount % cycleLength) || cycleLength} / ${cycleLength}`;
+
+        setMode(isLong ? "long" : "short");
+      } else {
+        setMode("focus");
+      }
+    }
+
+    function skip() {
+      // Treat as "finish now" (does not count a focus unless actually in focus mode)
+      // If you want skip to count, change to onDone() directly.
+      beep();
+      if (state.mode === "focus") {
+        // don't increment focusCount on skip
+        setMode("short");
+      } else {
+        setMode("focus");
+      }
+    }
+
+    function loadSettings() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          state.settings.focus = clampInt(parsed.focus, 1, 180, 25);
+          state.settings.short = clampInt(parsed.short, 1, 60, 5);
+          state.settings.long  = clampInt(parsed.long,  1, 120, 15);
+        }
+      } catch {}
+    }
+
+    function saveSettings() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.settings));
+    }
+
+    function clampInt(v, min, max, fallback) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(min, Math.min(max, Math.round(n)));
+    }
+
+    function applyInputs() {
+      state.settings.focus = clampInt(els.focusMins.value, 1, 180, 25);
+      state.settings.short = clampInt(els.shortMins.value, 1, 60, 5);
+      state.settings.long  = clampInt(els.longMins.value, 1, 120, 15);
+
+      els.focusMins.value = state.settings.focus;
+      els.shortMins.value = state.settings.short;
+      els.longMins.value  = state.settings.long;
+
+      // Keep current mode in sync
+      setMode(state.mode, { keepRunning: false });
+    }
+
+    function setTheme(theme) {
+      els.body.setAttribute("data-theme", theme);
+      const checked = theme === "dark";
+      els.themeSwitch.setAttribute("aria-checked", String(checked));
+      localStorage.setItem(THEME_KEY, theme);
+    }
+
+    function toggleTheme() {
+      const current = els.body.getAttribute("data-theme") || "dark";
+      setTheme(current === "dark" ? "light" : "dark");
+    }
+
+    function initTheme() {
+      const saved = localStorage.getItem(THEME_KEY);
+      if (saved === "light" || saved === "dark") return setTheme(saved);
+
+      // Respect OS preference if no saved theme
+      const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      setTheme(prefersDark ? "dark" : "light");
+    }
+
+    // --- Events ---
+    els.startPause.addEventListener("click", () => state.isRunning ? pause() : start());
+    els.reset.addEventListener("click", reset);
+    els.skip.addEventListener("click", skip);
+
+    els.focusBtn.addEventListener("click", () => setMode("focus"));
+    els.shortBtn.addEventListener("click", () => setMode("short"));
+    els.longBtn.addEventListener("click", () => setMode("long"));
+
+    els.apply.addEventListener("click", applyInputs);
+    els.save.addEventListener("click", () => { applyInputs(); saveSettings(); els.hint.textContent = "Saved ✓"; });
+
+    // Space toggles start/pause
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        state.isRunning ? pause() : start();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "r") {
+        // Let browser refresh as normal
+        return;
+      }
+    });
+
+    // Notifications permission on first interaction
+    window.addEventListener("click", () => {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+    }, { once: true });
+
+    // Theme toggle click + keyboard
+    els.themeSwitch.addEventListener("click", toggleTheme);
+    els.themeSwitch.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleTheme(); }
+    });
+
+    // --- Init ---
+    loadSettings();
+    els.focusMins.value = state.settings.focus;
+    els.shortMins.value = state.settings.short;
+    els.longMins.value  = state.settings.long;
+
+    initTheme();
+    setMode("focus");
+    els.sessionInfo.textContent = `Session: 1 / ${cycleLength}`;
+    render();
+  </script>
+</body>
+</html>
+
