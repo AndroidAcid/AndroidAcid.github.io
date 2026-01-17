@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>android acid — software</title>
+  <meta name="description" content="android acid software downloads — games and experiments." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <!-- HEADER -->
+  <header class="topbar">
+    <a class="brand" href="index.html">
+      <span class="brand-name">android acid</span>
+      <span class="brand-tag">software downloads</span>
+    </a>
+
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="software.html" aria-current="page">Software</a>
+      <a href="index.html#music">Music</a>
+      <a href="index.html#studio">Studio</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- PAGE HEADER -->
+    <section class="section">
+      <header class="section-head">
+        <h2>Software</h2>
+        <p>
+          Games, tools, and experiments.  
+          Click a module to download or learn more.
+        </p>
+      </header>
+
+      <!-- SOFTWARE GRID -->
+      <div class="grid three">
+
+        <!-- BREAKOUT -->
+        <article class="card software-card">
+          <a class="software-link" href="#" target="_blank" rel="noopener">
+            <div class="software-icon">
+              <span class="led l1"></span>
+              <span class="led l2"></span>
+              <span class="led l3"></span>
+            </div>
+
+            <h3>Breakout</h3>
+            <p class="muted">
+              Classic paddle-and-bricks.  
+              Pure reflex, zero mercy.
+            </p>
+
+            <div class="software-meta">
+              <span class="pill">Game</span>
+              <span class="pill">Arcade</span>
+              <span class="pill">v1.0</span>
+            </div>
+          </a>
+        </article>
+
+        <!-- CENTIPEDE -->
+        <article class="card software-card">
+          <a class="software-link" href="#" target="_blank" rel="noopener">
+            <div class="software-icon">
+              <span class="led l1"></span>
+              <span class="led l2"></span>
+              <span class="led l3"></span>
+            </div>
+
+            <h3>Centipede</h3>
+            <p class="muted">
+              Trackball chaos and pixel venom.  
+              The screen fights back.
+            </p>
+
+            <div class="software-meta">
+              <span class="pill">Game</span>
+              <span class="pill">Shooter</span>
+              <span class="pill">v0.9</span>
+            </div>
+          </a>
+        </article>
+
+        <!-- TETRIS -->
+        <article class="card software-card">
+          <a class="software-link" href="#" target="_blank" rel="noopener">
+            <div class="software-icon">
+              <span class="led l1"></span>
+              <span class="led l2"></span>
+              <span class="led l3"></span>
+            </div>
+
+            <h3>Tetris</h3>
+            <p class="muted">
+              Falling geometry.  
+              Order vs inevitability.
+            </p>
+
+            <div class="software-meta">
+              <span class="pill">Game</span>
+              <span class="pill">Puzzle</span>
+              <span class="pill">v1.2</span>
+            </div>
+          </a>
+        </article>
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>© <span id="year"></span> android acid</span>
+    <span class="muted">software modules online</span>
+  </footer>
+
+  <script>
+    document.getElementById("year").textContent =
+      new Date().getFullYear();
+
+    // Random LED blink speed per icon
+    document.querySelectorAll(".software-icon").forEach(icon => {
+      const speed = 0.6 + Math.random() * 1.2;
+      icon.style.setProperty("--blink-speed", speed + "s");
+    });
+  </script>
+</body>
+</html>
