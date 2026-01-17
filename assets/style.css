@@ -439,3 +439,53 @@ input:focus{
   .contact-grid{ grid-template-columns: 1fr; }
   .section-head{ flex-direction: column; align-items:flex-start; }
 }
+
+/* ===== Software page ===== */
+
+.software-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.software-link {
+  display: block;
+  height: 100%;
+}
+
+.software-icon {
+  --blink-speed: 1s;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.software-icon .led {
+  animation-duration: var(--blink-speed);
+}
+
+.software-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.pill {
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 160, 60, 0.35);
+  background: rgba(0,0,0,0.25);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.software-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 28px rgba(255,120,20,0.35);
+}
+
+.software-card:hover h3 {
+  text-shadow: 0 0 18px rgba(255,120,20,0.4);
+}
+
