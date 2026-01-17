@@ -3,130 +3,146 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>android acid — software</title>
-  <meta name="description" content="android acid software downloads — games and experiments." />
+  <meta name="theme-color" content="#00ff66" />
+  <meta name="description" content="Android Acid — Software downloads." />
+
+  <title>Android Acid — Software</title>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="assets/style.css" />
 </head>
 
 <body>
-  <div class="scanlines" aria-hidden="true"></div>
+  <a class="skip" href="#content">Skip to content</a>
 
-  <!-- HEADER -->
-  <header class="topbar">
-    <a class="brand" href="index.html">
-      <span class="brand-name">android acid</span>
-      <span class="brand-tag">software downloads</span>
-    </a>
+  <!-- SAME HEADER -->
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <div class="brand">
+        <img class="logo" src="assets/logo.svg" alt="Android Acid logo" />
+        <div class="brand-text">
+          <div class="brand-title">ANDROID ACID</div>
+          <div class="brand-sub">Acid • Synths • Software</div>
+        </div>
+      </div>
 
-    <nav class="nav">
-      <a href="index.html">Home</a>
-      <a href="software.html" aria-current="page">Software</a>
-      <a href="index.html#music">Music</a>
-      <a href="index.html#studio">Studio</a>
-    </nav>
+      <nav class="nav">
+        <a href="index.html#music">Music</a>
+        <a href="software.html" aria-current="page">Software</a>
+        <a href="index.html#studio">Studio</a>
+        <a href="index.html#contact">Contact</a>
+      </nav>
+
+      <button class="menu-btn" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </header>
 
-  <main>
-    <!-- PAGE HEADER -->
-    <section class="section">
-      <header class="section-head">
-        <h2>Software</h2>
-        <p>
-          Games, tools, and experiments.  
-          Click a module to download or learn more.
-        </p>
-      </header>
+  <main id="content">
+    <!-- HERO (same structure, different copy) -->
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <h1 class="glow">Software</h1>
+          <p class="muted">
+            Games and experiments.  
+            Click a module to download or learn more.
+          </p>
 
-      <!-- SOFTWARE GRID -->
-      <div class="grid three">
+          <div class="chips">
+            <a class="btn" href="index.html">Home</a>
+            <a class="btn" href="#games">Games</a>
+          </div>
+        </div>
 
-        <!-- BREAKOUT -->
-        <article class="card software-card">
-          <a class="software-link" href="#" target="_blank" rel="noopener">
-            <div class="software-icon">
-              <span class="led l1"></span>
-              <span class="led l2"></span>
-              <span class="led l3"></span>
+        <div class="hero-card">
+          <div class="panel">
+            <div class="panel-top">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              <span class="panel-title">software</span>
             </div>
+            <div class="panel-body">
+              <div class="meter">
+                <div class="meter-bar" style="--w: 72%"></div>
+                <div class="meter-bar" style="--w: 55%"></div>
+                <div class="meter-bar" style="--w: 61%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
+      <div class="hero-scanline" aria-hidden="true"></div>
+    </section>
+
+    <!-- SOFTWARE GRID -->
+    <section id="games" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Downloads</h2>
+        </div>
+
+        <div class="grid">
+
+          <!-- BREAKOUT -->
+          <a class="card" href="#" target="_blank" rel="noreferrer">
             <h3>Breakout</h3>
             <p class="muted">
-              Classic paddle-and-bricks.  
-              Pure reflex, zero mercy.
+              Paddle and bricks.  
+              Fast reflex, no forgiveness.
             </p>
-
-            <div class="software-meta">
+            <div class="meta">
               <span class="pill">Game</span>
               <span class="pill">Arcade</span>
               <span class="pill">v1.0</span>
             </div>
           </a>
-        </article>
 
-        <!-- CENTIPEDE -->
-        <article class="card software-card">
-          <a class="software-link" href="#" target="_blank" rel="noopener">
-            <div class="software-icon">
-              <span class="led l1"></span>
-              <span class="led l2"></span>
-              <span class="led l3"></span>
-            </div>
-
+          <!-- CENTIPEDE -->
+          <a class="card" href="#" target="_blank" rel="noreferrer">
             <h3>Centipede</h3>
             <p class="muted">
               Trackball chaos and pixel venom.  
               The screen fights back.
             </p>
-
-            <div class="software-meta">
+            <div class="meta">
               <span class="pill">Game</span>
               <span class="pill">Shooter</span>
               <span class="pill">v0.9</span>
             </div>
           </a>
-        </article>
 
-        <!-- TETRIS -->
-        <article class="card software-card">
-          <a class="software-link" href="#" target="_blank" rel="noopener">
-            <div class="software-icon">
-              <span class="led l1"></span>
-              <span class="led l2"></span>
-              <span class="led l3"></span>
-            </div>
-
+          <!-- TETRIS -->
+          <a class="card" href="#" target="_blank" rel="noreferrer">
             <h3>Tetris</h3>
             <p class="muted">
               Falling geometry.  
-              Order vs inevitability.
+              Order versus inevitability.
             </p>
-
-            <div class="software-meta">
+            <div class="meta">
               <span class="pill">Game</span>
               <span class="pill">Puzzle</span>
               <span class="pill">v1.2</span>
             </div>
           </a>
-        </article>
 
+        </div>
       </div>
     </section>
   </main>
 
+  <!-- SAME FOOTER -->
   <footer class="footer">
-    <span>© <span id="year"></span> android acid</span>
-    <span class="muted">software modules online</span>
+    <div class="wrap footer-inner">
+      <div class="muted small">© <span id="year"></span> Android Acid</div>
+      <div class="muted small">Software modules online</div>
+    </div>
   </footer>
 
   <script>
     document.getElementById("year").textContent =
       new Date().getFullYear();
-
-    // Random LED blink speed per icon
-    document.querySelectorAll(".software-icon").forEach(icon => {
-      const speed = 0.6 + Math.random() * 1.2;
-      icon.style.setProperty("--blink-speed", speed + "s");
-    });
   </script>
 </body>
 </html>
