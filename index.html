@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#00ff66" />
-  <meta name="description" content="Android Acid — Acid, Synths, and Software." />
+  <meta name="description" content="Android Acid — Software downloads." />
 
-  <title>Android Acid</title>
+  <title>Android Acid — Software</title>
 
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="assets/style.css" />
@@ -15,10 +15,10 @@
 <body>
   <a class="skip" href="#content">Skip to content</a>
 
+  <!-- SAME HEADER -->
   <header class="site-header">
     <div class="wrap header-inner">
       <div class="brand">
-        <!-- Replace assets/logo.svg with your exact logo if you want -->
         <img class="logo" src="assets/logo.svg" alt="Android Acid logo" />
         <div class="brand-text">
           <div class="brand-title">ANDROID ACID</div>
@@ -27,10 +27,10 @@
       </div>
 
       <nav class="nav">
-        <a href="#music">Music</a>
-        <a href="#software">Software</a>
-        <a href="#studio">Studio</a>
-        <a href="#contact">Contact</a>
+        <a href="index.html#music">Music</a>
+        <a href="software.html" aria-current="page">Software</a>
+        <a href="index.html#studio">Studio</a>
+        <a href="index.html#contact">Contact</a>
       </nav>
 
       <button class="menu-btn" aria-label="Open menu" aria-expanded="false">
@@ -40,20 +40,19 @@
   </header>
 
   <main id="content">
+    <!-- HERO (same structure, different copy) -->
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <h1 class="glow">Acid, noise, and machines that argue back.</h1>
+          <h1 class="glow">Software</h1>
           <p class="muted">
-            Welcome to <strong>Android Acid</strong>. This is my home for releases, weird little audio tools,
-            and photos from the studio.
+            Games and experiments.  
+            Click a module to download or learn more.
           </p>
-          
-        <div class="chips" aria-label="tags">
-            <a class="btn" href="#music">Music</a>
-            <a class="btn" href="#software">Software</a>
-            <a class="btn" href="#studio">Studio</a>
-            <a class="btn" href="#contact">Contact</a>
+
+          <div class="chips">
+            <a class="btn" href="index.html">Home</a>
+            <a class="btn" href="#games">Games</a>
           </div>
         </div>
 
@@ -61,14 +60,13 @@
           <div class="panel">
             <div class="panel-top">
               <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-              <span class="panel-title">v1.0</span>
+              <span class="panel-title">software</span>
             </div>
             <div class="panel-body">
               <div class="meter">
-                <div class="meter-bar" style="--w: 88%"></div>
-                <div class="meter-bar" style="--w: 63%"></div>
-                <div class="meter-bar" style="--w: 74%"></div>
-                <div class="meter-bar" style="--w: 49%"></div>
+                <div class="meter-bar" style="--w: 72%"></div>
+                <div class="meter-bar" style="--w: 55%"></div>
+                <div class="meter-bar" style="--w: 61%"></div>
               </div>
             </div>
           </div>
@@ -78,83 +76,73 @@
       <div class="hero-scanline" aria-hidden="true"></div>
     </section>
 
-    <section id="music" class="section">
+    <!-- SOFTWARE GRID -->
+    <section id="games" class="section">
       <div class="wrap">
         <div class="section-head">
-          <h2>Music</h2>
+          <h2>Downloads</h2>
         </div>
 
-        <div id="musicGrid" class="grid"></div>
+        <div class="grid">
 
-        <div class="links-row">
-          <a class="link" href="https://soundcloud.com/rgbelasco" target="_blank" rel="noreferrer">SoundCloud</a>
-          <span class="sep">•</span>
-          <a class="link" href="#contact">Bookings / collabs</a>
-        </div>
-      </div>
-    </section>
+          <!-- BREAKOUT -->
+          <a class="card" href="#" target="_blank" rel="noreferrer">
+            <h3>Breakout</h3>
+            <p class="muted">
+              Paddle and bricks.  
+              Fast reflex, no forgiveness.
+            </p>
+            <div class="meta">
+              <span class="pill">Game</span>
+              <span class="pill">Arcade</span>
+              <span class="pill">v1.0</span>
+            </div>
+          </a>
 
-    <section id="software" class="section">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>Audio software</h2>
-        </div>
+          <!-- CENTIPEDE -->
+          <a class="card" href="#" target="_blank" rel="noreferrer">
+            <h3>Centipede</h3>
+            <p class="muted">
+              Trackball chaos and pixel venom.  
+              The screen fights back.
+            </p>
+            <div class="meta">
+              <span class="pill">Game</span>
+              <span class="pill">Shooter</span>
+              <span class="pill">v0.9</span>
+            </div>
+          </a>
 
-        <div id="softwareGrid" class="grid"></div>
-      </div>
-    </section>
+          <!-- TETRIS -->
+          <a class="card" href="#" target="_blank" rel="noreferrer">
+            <h3>Tetris</h3>
+            <p class="muted">
+              Falling geometry.  
+              Order versus inevitability.
+            </p>
+            <div class="meta">
+              <span class="pill">Game</span>
+              <span class="pill">Puzzle</span>
+              <span class="pill">v1.2</span>
+            </div>
+          </a>
 
-    <section id="studio" class="section">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>Studio</h2>
-        </div>
-
-        <div id="gallery" class="gallery"></div>
-      </div>
-    </section>
-
-    <section id="contact" class="section">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>Contact</h2>
-        </div>
-
-        <div class="contact-grid">
-          <div class="card">
-            <h3>Reach me</h3>
-            <p class="muted">For releases, licensing, collabs, and audio tool questions.</p>
-
-            <ul class="list">
-              <li><span class="k">SoundCloud</span> <a class="link" href="https://soundcloud.com/rgbelasco" target="_blank" rel="noreferrer">/rgbelasco</a></li>
-              <li><span class="k">YouTube</span> <a class="link" href="https://www.youtube.com/@AndroidAcid">@AndroidAcid</a></li>
-              <li><span class="k">GitHub</span> <a class="link" href="https://github.com/YOUR_USERNAME" target="_blank" rel="noreferrer">@AndroidAcid</a></li>
-            </ul>
-          </div>
-
-          <div class="card">
-            <h3>Newsletter / updates</h3>
-            <form id="updatesForm" class="form">
-              <label class="label">
-                <span>Email</span>
-                <input required type="email" name="email" placeholder="acid@signals.net" />
-              </label>
-              <button class="btn" type="submit">Notify me</button>
-              <p class="muted tiny" id="updatesMsg" aria-live="polite"></p>
-            </form>
-          </div>
         </div>
       </div>
     </section>
   </main>
 
+  <!-- SAME FOOTER -->
   <footer class="footer">
     <div class="wrap footer-inner">
       <div class="muted small">© <span id="year"></span> Android Acid</div>
-      <div class="muted small">Built for GitHub Pages • Neon responsibly</div>
+      <div class="muted small">Software modules online</div>
     </div>
   </footer>
 
-  <script src="assets/app.js"></script>
+  <script>
+    document.getElementById("year").textContent =
+      new Date().getFullYear();
+  </script>
 </body>
 </html>
