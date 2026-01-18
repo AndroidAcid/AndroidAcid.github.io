@@ -18,7 +18,7 @@ const CONFIG = {
       desc: "Acid / Minimal Wave",
       tags: ["Acid", "Minimal Wave", "Live"],
       // SoundCloud embed: swap to any track/playlist embed URL you want
-      embedUrl: "https://bandcamp.com/EmbeddedPlayer/track=870727442/size=large/bgcol=ffffff/linkcol=0687f5/tracklist=false/transparent=true/",
+      embedUrl: "https://bandcamp.com/EmbeddedPlayer/track=870727442/size=small/bgcol=333333/linkcol=0f91ff/transparent=true/",
       links: [
         { label: "Open on Bandcamp", href: "https://androidacid.bandcamp.com/" }
       ]
