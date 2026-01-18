@@ -1,1 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Neon Tetris</title>
+<style>
+  html, body { margin:0; background:#000; overflow:hidden; }
+  canvas { display:block; width:100vw; height:100vh; touch-action:none; }
+  .hint{
+    position:fixed; left:50%; bottom:10px; transform:translateX(-50%);
+    color:#9ff; font:12px monospace; opacity:.85; user-select:none; pointer-events:none;
+    text-shadow:0 0 10px rgba(153,255,255,.4);
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hint">
+  Move: ←/→ · Rotate: ↑/X · Soft drop: ↓ · Hard drop: Space · Hold: C · Pause: P · R: Restart · Click once for sound
+</div>
 
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false });
+const DPR = devicePixelRatio || 1;
+
+/* ================= RESIZE + SCREEN FACTOR ================= */
+let screenFactor = 1;
+function resize(){
+  canvas.width  = innerWidth  * DPR;
+  canvas.height = innerHeight * DPR;
+  const area = canvas.width * canvas.height;
+  const refArea = 1920 * 1080 * DPR * DPR;
+  screenFactor = Math.sqrt(area / refArea);
+  screenFactor = Math.max(0.55, Math.min(1.15, screenFactor));
+}
+addEventListener("resize", resize);
+resize();
+
+/* ================= INPUT ================= */
+const keys = new Set();
+const pressed = new Set(); // one-shot actions
+addEventListener("keydown", e => { keys.add(e.code); pressed.add(e.code); });
+addEventListener("keyup", e => keys.delete(e.code));
+
+/* ================= UTILS ================= */
+const rand = (a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const W=()=>canvas.width, H=()=>canvas.height;
+
+/* ================= AUDIO ================= */
+const AC = new (window.AudioContext||webkitAudioContext)();
+addEventListener("click", () => { if (AC.state === "suspended") AC.resume(); }, { once:true });
+
+function beep(freq,dur,type="sine",vol=0.12){
+  if (AC.state !== "running") return;
+  const o=AC.createOscillator(), g=AC.createGain();
+  o.type=type; o.frequency.value=freq;
+  g.gain.value=vol;
+  o.connect(g); g.connect(AC.destination);
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+  o.stop(AC.currentTime + dur);
+}
+
+/* ================= FX: PARTICLES + SHAKE ================= */
+let time = 0;
+let shake = 0;
+const particles = [];
+
+function burst(x,y,h,n=40,p=1){
+  n = Math.floor(n * screenFactor);
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2;
+    const s=rand(120,700)*p;
+    particles.push({
+      x,y,
+      vx:Math.cos(a)*s,
+      vy:Math.sin(a)*s,
+      life:rand(0.25,0.9),
+      r:rand(2,5),
+      h:(h+rand(-35,35)+360)%360
+    });
+  }
+}
+
+/* ================= TETRIS CORE ================= */
+const COLS = 10;
+const ROWS = 22;      // includes 2 hidden rows at top
+const VISIBLE = 20;
+
+const bag = [];
+const board = Array.from({length: ROWS}, ()=>Array(COLS).fill(0));
+
+/* ====== Color shift system ====== */
+let hueShift = 0;
+const levelHueStep = 16; // tweak 8-22
+const shiftHue = (h)=> (h + hueShift) % 360;
+
+const hues = {
+  I: 190, O: 55, T: 300, S: 120, Z: 0, J: 220, L: 35,
+  GHOST: 195
+};
+
+const shapes = {
+  I: [
+    [0,0,0,0],
+    [1,1,1,1],
+    [0,0,0,0],
+    [0,0,0,0],
+  ],
+  O: [
+    [0,1,1,0],
+    [0,1,1,0],
+    [0,0,0,0],
+    [0,0,0,0],
+  ],
+  T: [
+    [0,1,0,0],
+    [1,1,1,0],
+    [0,0,0,0],
+    [0,0,0,0],
+  ],
+  S: [
+    [0,1,1,0],
+    [1,1,0,0],
+    [0,0,0,0],
+    [0,0,0,0],
+  ],
+  Z: [
+    [1,1,0,0],
+    [0,1,1,0],
+    [0,0,0,0],
+    [0,0,0,0],
+  ],
+  J: [
+    [1,0,0,0],
+    [1,1,1,0],
+    [0,0,0,0],
+    [0,0,0,0],
+  ],
+  L: [
+    [0,0,1,0],
+    [1,1,1,0],
+    [0,0,0,0],
+    [0,0,0,0],
+  ],
+};
+
+function cloneM(m){ return m.map(r=>r.slice()); }
+
+function rotateCW(m){
+  const n = m.length;
+  const out = Array.from({length:n}, ()=>Array(n).fill(0));
+  for(let y=0;y<n;y++) for(let x=0;x<n;x++) out[x][n-1-y] = m[y][x];
+  return out;
+}
+
+function canPlace(m, px, py){
+  for(let y=0;y<4;y++){
+    for(let x=0;x<4;x++){
+      if(!m[y][x]) continue;
+      const bx = px + x;
+      const by = py + y;
+      if(bx<0 || bx>=COLS || by>=ROWS) return false;
+      if(by>=0 && board[by][bx]) return false;
+    }
+  }
+  return true;
+}
+
+function lockPiece(p){
+  for(let y=0;y<4;y++){
+    for(let x=0;x<4;x++){
+      if(!p.m[y][x]) continue;
+      const bx = p.x + x;
+      const by = p.y + y;
+      if(by>=0 && by<ROWS && bx>=0 && bx<COLS){
+        board[by][bx] = p.type;
+      }
+    }
+  }
+}
+
+/* ================= GAME OVER (TOP-OUT) HELPERS ================= */
+function isTopOut(){
+  // rows 0..(ROWS-VISIBLE-1) are hidden spawn rows (2 rows)
+  for(let y=0;y<ROWS - VISIBLE;y++){
+    for(let x=0;x<COLS;x++){
+      if(board[y][x]) return true;
+    }
+  }
+  return false;
+}
+function triggerGameOver(){
+  gameOver = true;
+  paused = false;
+  shake = Math.max(shake, 30);
+  const c = boardCenter();
+  burst(c.x, c.y, shiftHue(0), 150, 2.4);
+  beep(60, 0.6, "sine", 0.25);
+}
+
+function clearLines(){
+  const full = [];
+  for(let y=0;y<ROWS;y++){
+    let ok = true;
+    for(let x=0;x<COLS;x++){ if(!board[y][x]){ ok=false; break; } }
+    if(ok) full.push(y);
+  }
+  if(!full.length) return 0;
+
+  for(const y of full){
+    for(let x=0;x<COLS;x++){
+      const {cx,cy} = cellToScreen(x,y);
+      const h = shiftHue(rand(0,360));
+      burst(cx, cy, h, 10, 0.9);
+      burst(cx, cy, shiftHue((h+40)%360), 6, 0.7);
+    }
+  }
+  shake = Math.max(shake, 20);
+
+  for(const y of full){
+    board.splice(y, 1);
+    board.unshift(Array(COLS).fill(0));
+  }
+  return full.length;
+}
+
+function nextFromBag(){
+  if(bag.length === 0){
+    const types = ["I","O","T","S","Z","J","L"];
+    for(let i=types.length-1;i>0;i--){
+      const j = (Math.random()*(i+1))|0;
+      [types[i],types[j]] = [types[j],types[i]];
+    }
+    bag.push(...types);
+  }
+  return bag.pop();
+}
+
+let score = 0;
+let level = 1;
+let linesTotal = 0;
+
+let fallTimer = 0;
+let lockDelay = 0;
+let paused = false;
+let gameOver = false;
+
+let hold = null;
+let holdUsed = false;
+
+let piece = null;
+let nextQueue = [nextFromBag(), nextFromBag(), nextFromBag(), nextFromBag(), nextFromBag()];
+
+/* ================= VISUAL FX ================= */
+function drawBG(){
+  ctx.fillStyle="rgba(0,0,0,0.22)";
+  ctx.fillRect(0,0,W(),H());
+  ctx.globalAlpha=0.10;
+  for(let i=0;i<20;i++){
+    const y=(i*H()/20 + time*140) % H();
+    ctx.fillStyle=`hsl(${shiftHue((time*60+i*20)%360)},100%,60%)`;
+    ctx.fillRect(0,y,W(),H()/42);
+  }
+  ctx.globalAlpha=1;
+}
+
+function scanlines(){
+  ctx.globalAlpha=0.12;
+  ctx.fillStyle=`hsl(${shiftHue(200)},50%,5%)`;
+  for(let y=0;y<H();y+=4*DPR) ctx.fillRect(0,y,W(),2*DPR);
+  ctx.globalAlpha=1;
+}
+
+function chroma(){
+  const s=Math.sin(time*5)*3*DPR;
+  ctx.globalAlpha=0.32;
+  ctx.drawImage(canvas,-s,0);
+  ctx.drawImage(canvas,s,0);
+  ctx.globalAlpha=1;
+}
+
+/* ================= GAMEPLAY ================= */
+function spawn(){
+  const type = nextQueue.shift();
+  nextQueue.push(nextFromBag());
+
+  piece = { type, m: cloneM(shapes[type]), x: 3, y: -2 };
+  holdUsed = false;
+
+  if(!canPlace(piece.m, piece.x, piece.y)){
+    triggerGameOver();
+  } else {
+    beep(220,0.04,"triangle",0.08);
+  }
+}
+
+function hardDrop(){
+  if(gameOver || paused) return;
+  let dy = 0;
+  while(canPlace(piece.m, piece.x, piece.y+1)){ piece.y++; dy++; }
+  score += dy * 2;
+  lockNow();
+  beep(110,0.06,"square",0.10);
+}
+
+function softDrop(dt){
+  if(gameOver || paused) return;
+  if(canPlace(piece.m, piece.x, piece.y+1)){
+    piece.y++;
+    score += 1;
+    fallTimer = 0;
+  } else {
+    lockDelay += dt;
+  }
+}
+
+function move(dx){
+  if(gameOver || paused) return;
+  if(canPlace(piece.m, piece.x+dx, piece.y)){
+    piece.x += dx;
+    beep(420,0.02,"square",0.04);
+  }
+}
+
+function rotate(){
+  if(gameOver || paused) return;
+  const r = rotateCW(piece.m);
+  const kicks = [
+    {x:0,y:0},{x:-1,y:0},{x:1,y:0},{x:-2,y:0},{x:2,y:0},{x:0,y:-1}
+  ];
+  for(const k of kicks){
+    if(canPlace(r, piece.x+k.x, piece.y+k.y)){
+      piece.m = r;
+      piece.x += k.x;
+      piece.y += k.y;
+      beep(740,0.03,"triangle",0.06);
+      burstPieceOutline(0.45);
+      return;
+    }
+  }
+}
+
+function holdSwap(){
+  if(gameOver || paused) return;
+  if(holdUsed) return;
+  holdUsed = true;
+  beep(520,0.05,"sawtooth",0.06);
+
+  const cur = piece.type;
+  if(hold === null){
+    hold = cur;
+    spawn();
+  } else {
+    const tmp = hold;
+    hold = cur;
+    piece = { type: tmp, m: cloneM(shapes[tmp]), x: 3, y: -2 };
+    if(!canPlace(piece.m, piece.x, piece.y)){
+      triggerGameOver();
+    }
+  }
+}
+
+/* ====== Speed curve (gradual + capped) ====== */
+function gravity(){
+  const minGravity = 0.11;
+  const base = 0.72;
+  const curve = 0.035;
+  const g = base * Math.exp(-curve * (level - 1));
+  return Math.max(minGravity, g);
+}
+
+function applyLevelEffects(oldLevel, newLevel){
+  if(newLevel <= oldLevel) return;
+  hueShift = (newLevel - 1) * levelHueStep % 360;
+  shake = Math.max(shake, 18);
+  const c = boardCenter();
+  burst(c.x, c.y, shiftHue(rand(0,360)), 90, 1.6);
+  beep(900, 0.12, "square", 0.15);
+}
+
+function lockNow(){
+  lockDelay = 0;
+  lockPiece(piece);
+
+  // ===== GAME OVER SECTION (TOP-OUT) =====
+  if(isTopOut()){
+    triggerGameOver();
+    return; // don't clear lines / spawn next
+  }
+
+  const c = pieceCenter(piece);
+  burst(c.x, c.y, shiftHue(hues[piece.type]), 26, 1.0);
+  shake = Math.max(shake, 10);
+  beep(160,0.05,"triangle",0.08);
+
+  const cleared = clearLines();
+
+  if(cleared){
+    const pts = [0,100,300,500,800][cleared] * level;
+    score += pts;
+    linesTotal += cleared;
+
+    const oldLevel = level;
+    level = 1 + Math.floor(linesTotal / 12);
+    applyLevelEffects(oldLevel, level);
+
+    beep(320,0.06,"sawtooth",0.11);
+    if(cleared>=2) beep(480,0.07,"sawtooth",0.12);
+    if(cleared>=3) beep(640,0.08,"sawtooth",0.13);
+    if(cleared>=4) beep(880,0.10,"square",0.14);
+  }
+
+  spawn();
+}
+
+function boardCenter(){
+  const g = computeLayout();
+  return { x: g.x + g.w/2, y: g.y + g.h/2 };
+}
+
+function pieceCenter(p){
+  const g = computeLayout();
+  const cx = g.x + (p.x+2)*g.cell;
+  const cy = g.y + (p.y+2 - (ROWS - VISIBLE))*g.cell;
+  return {x:cx, y:cy};
+}
+
+function burstPieceOutline(power=1){
+  for(let y=0;y<4;y++){
+    for(let x=0;x<4;x++){
+      if(!piece.m[y][x]) continue;
+      const bx = piece.x + x;
+      const by = piece.y + y;
+      if(by < 0) continue;
+      const {cx,cy} = cellToScreen(bx,by);
+      burst(cx,cy,shiftHue(hues[piece.type]),8,0.8*power);
+    }
+  }
+}
+
+/* ================= LAYOUT + RENDER ================= */
+function computeLayout(){
+  const pad = 28 * DPR;
+  const availW = W() - pad*2;
+  const availH = H() - pad*2;
+
+  const uiW = Math.max(220*DPR, availW*0.22);
+  const wide = availW > availH * 0.9;
+
+  let fieldW, fieldH, x, y, cell;
+  if(wide){
+    fieldH = Math.min(availH, availH);
+    cell = Math.floor(Math.min((availW - uiW) / COLS, fieldH / VISIBLE));
+    fieldW = cell * COLS;
+    fieldH = cell * VISIBLE;
+    x = Math.floor((W() - uiW - fieldW)/2);
+    y = Math.floor((H() - fieldH)/2);
+    return { x, y, w: fieldW, h: fieldH, cell, uiX: x+fieldW+18*DPR, uiY: y, uiW: uiW-18*DPR, wide:true };
+  } else {
+    cell = Math.floor(Math.min(availW / COLS, (availH*0.78) / VISIBLE));
+    fieldW = cell * COLS;
+    fieldH = cell * VISIBLE;
+    x = Math.floor((W() - fieldW)/2);
+    y = Math.floor((H() - fieldH)/2 - 40*DPR);
+    return { x, y, w: fieldW, h: fieldH, cell, uiX: x, uiY: y+fieldH+14*DPR, uiW: fieldW, wide:false };
+  }
+}
+
+function cellToScreen(bx, by){
+  const g = computeLayout();
+  const vy = by - (ROWS - VISIBLE);
+  const x = g.x + bx * g.cell;
+  const y = g.y + vy * g.cell;
+  return { x, y, cx: x + g.cell/2, cy: y + g.cell/2, cell: g.cell, g };
+}
+
+function drawCell(px, py, size, h, alpha=1, glow=1){
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  ctx.fillStyle = `hsl(${shiftHue(h)},100%,55%)`;
+  ctx.fillRect(px+1, py+1, size-2, size-2);
+
+  ctx.globalAlpha = alpha*0.55;
+  ctx.fillStyle = `hsl(${shiftHue(h)},100%,75%)`;
+  ctx.fillRect(px+3, py+3, size-6, size-10);
+
+  ctx.globalAlpha = alpha*0.18*glow;
+  ctx.fillStyle = `hsl(${shiftHue(h)},100%,60%)`;
+  ctx.fillRect(px-2, py-2, size+4, size+4);
+
+  ctx.restore();
+}
+
+function drawFrame(g){
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = `hsl(${shiftHue((time*80)%360)},100%,60%)`;
+  ctx.lineWidth = 2*DPR;
+  ctx.strokeRect(g.x-4*DPR, g.y-4*DPR, g.w+8*DPR, g.h+8*DPR);
+
+  ctx.globalAlpha = 0.08;
+  ctx.strokeStyle = "#9ff";
+  ctx.lineWidth = 1*DPR;
+  for(let x=1;x<COLS;x++){
+    const xx = g.x + x*g.cell;
+    ctx.beginPath(); ctx.moveTo(xx, g.y); ctx.lineTo(xx, g.y+g.h); ctx.stroke();
+  }
+  for(let y=1;y<VISIBLE;y++){
+    const yy = g.y + y*g.cell;
+    ctx.beginPath(); ctx.moveTo(g.x, yy); ctx.lineTo(g.x+g.w, yy); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBoard(){
+  const g = computeLayout();
+
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(g.x, g.y, g.w, g.h);
+  ctx.restore();
+
+  ctx.globalCompositeOperation = "lighter";
+  for(let by=ROWS-VISIBLE; by<ROWS; by++){
+    for(let bx=0; bx<COLS; bx++){
+      const t = board[by][bx];
+      if(!t) continue;
+      const {x,y,cell} = cellToScreen(bx,by);
+      drawCell(x,y,cell, hues[t], 1, 1);
+    }
+  }
+  ctx.globalCompositeOperation = "source-over";
+  drawFrame(g);
+}
+
+function ghostY(){
+  let y = piece.y;
+  while(canPlace(piece.m, piece.x, y+1)) y++;
+  return y;
+}
+
+function drawPiece(p, isGhost=false){
+  const gy = isGhost ? ghostY() : p.y;
+  ctx.globalCompositeOperation = "lighter";
+  for(let y=0;y<4;y++){
+    for(let x=0;x<4;x++){
+      if(!p.m[y][x]) continue;
+      const bx = p.x + x;
+      const by = gy + y;
+      if(by < ROWS - VISIBLE) continue;
+      if(by >= ROWS) continue;
+      const {x:px, y:py, cell} = cellToScreen(bx,by);
+      const h = isGhost ? hues.GHOST : hues[p.type];
+      const a = isGhost ? 0.22 : 1.0;
+      const glow = isGhost ? 0.7 : 1.25;
+      drawCell(px,py,cell,h,a,glow);
+    }
+  }
+  ctx.globalCompositeOperation = "source-over";
+}
+
+function drawMiniMatrix(type, x, y, cell, alpha=1){
+  const m = shapes[type];
+  let minX=4, minY=4, maxX=-1, maxY=-1;
+  for(let yy=0;yy<4;yy++) for(let xx=0;xx<4;xx++) if(m[yy][xx]){
+    minX=Math.min(minX,xx); minY=Math.min(minY,yy);
+    maxX=Math.max(maxX,xx); maxY=Math.max(maxY,yy);
+  }
+  const w = (maxX-minX+1);
+  const hgt = (maxY-minY+1);
+  const offX = x + ((4-w)*cell)/2 - minX*cell;
+  const offY = y + ((4-hgt)*cell)/2 - minY*cell;
+
+  ctx.globalCompositeOperation = "lighter";
+  for(let yy=0;yy<4;yy++){
+    for(let xx=0;xx<4;xx++){
+      if(!m[yy][xx]) continue;
+      drawCell(offX+xx*cell, offY+yy*cell, cell, hues[type], alpha, 1.0);
+    }
+  }
+  ctx.globalCompositeOperation = "source-over";
+}
+
+function drawParticles(){
+  ctx.globalCompositeOperation="lighter";
+  for(const p of particles){
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = `hsl(${shiftHue(p.h)},100%,70%)`;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation="source-over";
+}
+
+function drawUI(){
+  const g = computeLayout();
+  ctx.save();
+
+  const uiX = g.uiX, uiY = g.uiY;
+  const font = `${16*DPR}px monospace`;
+  const small = `${12*DPR}px monospace`;
+
+  ctx.fillStyle = `hsl(${shiftHue(190)},100%,80%)`;
+  ctx.font = font;
+
+  const lineH = 22*DPR;
+  let y = uiY + 18*DPR;
+
+  ctx.globalAlpha = 0.9;
+  ctx.fillText("NEON TETRIS", uiX, y);
+  y += lineH;
+
+  ctx.font = small;
+  ctx.globalAlpha = 0.85;
+  ctx.fillText(`SCORE  ${score}`, uiX, y); y += 18*DPR;
+  ctx.fillText(`LEVEL  ${level}`, uiX, y); y += 18*DPR;
+  ctx.fillText(`LINES  ${linesTotal}`, uiX, y); y += 22*DPR;
+
+  ctx.globalAlpha = 0.9;
+  ctx.fillText("NEXT", uiX, y); y += 8*DPR;
+
+  const miniCell = Math.floor(16*DPR*screenFactor);
+  for(let i=0;i<3;i++){
+    drawMiniMatrix(nextQueue[i], uiX, y+6*DPR, miniCell, 0.9);
+    y += miniCell*4 + 10*DPR;
+  }
+
+  y += 6*DPR;
+  ctx.globalAlpha = 0.9;
+  ctx.fillText("HOLD", uiX, y); y += 8*DPR;
+
+  if(hold){
+    drawMiniMatrix(hold, uiX, y+6*DPR, miniCell, holdUsed ? 0.45 : 0.9);
+  } else {
+    ctx.globalAlpha = 0.5;
+    ctx.fillText("(none)", uiX, y+26*DPR);
+  }
+
+  const statusY = (g.wide ? (g.y + g.h - 34*DPR) : (uiY + 8*DPR));
+  ctx.globalAlpha = 0.85;
+  ctx.font = small;
+
+  if(paused && !gameOver){
+    ctx.fillText("PAUSED", uiX, statusY);
+  }
+
+  ctx.restore();
+}
+
+/* ================= GAME OVER OVERLAY (NEW SECTION) ================= */
+function drawGameOverOverlay(){
+  if(!gameOver) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+
+  // dim screen
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0,0,W(),H());
+
+  // centered text
+  ctx.globalAlpha = 1;
+  const title = "GAME OVER";
+  const sub = "Press R to restart";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  ctx.font = `${42*DPR}px monospace`;
+  ctx.fillStyle = `hsl(${shiftHue((time*120)%360)},100%,70%)`;
+  ctx.fillText(title, W()/2, H()/2 - 10*DPR);
+
+  ctx.font = `${16*DPR}px monospace`;
+  ctx.fillStyle = `hsl(${shiftHue(190)},100%,80%)`;
+  ctx.fillText(sub, W()/2, H()/2 + 34*DPR);
+
+  ctx.restore();
+}
+
+/* ================= GAME LOOP ================= */
+function update(dt){
+  if(paused || gameOver) return;
+
+  handleMovement(dt);
+
+  if(keys.has("ArrowDown")){
+    softDrop(dt);
+  } else {
+    fallTimer += dt;
+    if(fallTimer >= gravity()){
+      fallTimer = 0;
+      if(canPlace(piece.m, piece.x, piece.y+1)){
+        piece.y++;
+      } else {
+        lockDelay += dt;
+      }
+    }
+  }
+
+  if(!canPlace(piece.m, piece.x, piece.y+1)){
+    lockDelay += dt;
+    if(lockDelay >= 0.22){
+      lockNow();
+    }
+  } else {
+    lockDelay = 0;
+  }
+}
+
+let moveRepT = 0;
+let moveDir = 0;
+
+function handleMovement(dt){
+  const left = keys.has("ArrowLeft");
+  const right = keys.has("ArrowRight");
+  const dir = (right?1:0) - (left?1:0);
+
+  if(dir === 0){
+    moveRepT = 0;
+    moveDir = 0;
+    return;
+  }
+
+  const DAS = 0.14;
+  const ARR = 0.045;
+
+  if(moveDir !== dir){
+    moveDir = dir;
+    moveRepT = 0;
+    return;
+  }
+
+  moveRepT += dt;
+  if(moveRepT > DAS){
+    const reps = Math.floor((moveRepT - DAS) / ARR);
+    if(reps > 0){
+      for(let i=0;i<reps;i++) move(dir);
+      moveRepT -= reps * ARR;
+    }
+  }
+}
+
+function handleOneShots(){
+  if(pressed.has("KeyP") && !gameOver){
+    paused = !paused;
+    beep(paused?180:360,0.06,"triangle",0.08);
+  }
+
+  if(gameOver){
+    if(pressed.has("KeyR")) restart();
+    pressed.clear();
+    return;
+  }
+
+  if(pressed.has("ArrowUp") || pressed.has("KeyX")) rotate();
+  if(pressed.has("ArrowLeft")) move(-1);
+  if(pressed.has("ArrowRight")) move(1);
+  if(pressed.has("Space")) hardDrop();
+  if(pressed.has("KeyC")) holdSwap();
+
+  pressed.clear();
+}
+
+function restart(){
+  for(let y=0;y<ROWS;y++) board[y].fill(0);
+  particles.length = 0;
+  shake = 0;
+
+  score = 0;
+  level = 1;
+  linesTotal = 0;
+  hueShift = 0;
+
+  paused = false;
+  gameOver = false;
+
+  hold = null;
+  holdUsed = false;
+
+  nextQueue = [nextFromBag(), nextFromBag(), nextFromBag(), nextFromBag(), nextFromBag()];
+  spawn();
+
+  beep(520,0.08,"square",0.10);
+}
+
+function updateParticles(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.life -= dt;
+    p.x += p.vx*dt;
+    p.y += p.vy*dt;
+    p.vx *= 0.955;
+    p.vy *= 0.955;
+    if(p.life <= 0) particles.splice(i,1);
+  }
+}
+
+/* ================= MAIN LOOP ================= */
+let last = performance.now();
+
+function step(now){
+  const dt = Math.min(0.033, (now-last)/1000);
+  last = now;
+  time += dt;
+
+  handleOneShots();
+  update(dt);
+  updateParticles(dt);
+
+  drawBG();
+
+  const sx=(Math.random()*2-1)*shake*DPR;
+  const sy=(Math.random()*2-1)*shake*DPR;
+  shake = Math.max(0, shake - dt*40);
+
+  ctx.save();
+  ctx.translate(W()/2+sx, H()/2+sy);
+  ctx.scale(1+Math.sin(time*4)*0.006, 1+Math.sin(time*4)*0.006);
+  ctx.translate(-W()/2, -H()/2);
+
+  drawBoard();
+  if(piece && !gameOver){
+    drawPiece(piece, true);
+    drawPiece(piece, false);
+  }
+  drawParticles();
+  drawUI();
+
+  ctx.restore();
+
+  chroma();
+  scanlines();
+
+  // NEW: Game Over overlay
+  drawGameOverOverlay();
+
+  requestAnimationFrame(step);
+}
+
+/* ================= START ================= */
+spawn();
+requestAnimationFrame(step);
+
+});
+</script>
+</body>
+</html>
