@@ -38,6 +38,16 @@ const CONFIG = {
       links: [
         { label: "Get it", href: "#" }
       ]
+    },
+    {
+      name: "Games",
+      version: "2026.01",
+      desc: "",
+      
+      tags: ["Games", "Javascript", "Old-Skool"],
+      links: [
+        { label: "Get it", href: "#" }
+      ]
     }
   ],
 
