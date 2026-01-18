@@ -8,7 +8,7 @@ const CONFIG = {
       desc: "Acid / Minimal Wave",
       tags: ["Acid", "Minimal Wave", "Live"],
       // SoundCloud embed: swap to any track/playlist embed URL you want
-      embedUrl: "https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/soundcloud%253Atracks%253A2241053156&color=%2310cf10&inverse=true&auto_play=false&show_user=true",
+      embedUrl: "https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/soundcloud%253Atracks%253A2241053156&color=%2310cf10&inverse=false&auto_play=false&show_user=true",
       links: [
         { label: "Open on SoundCloud", href: "https://soundcloud.com/rgbelasco/" }
       ]
