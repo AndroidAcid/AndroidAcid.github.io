@@ -44,8 +44,7 @@ const CONFIG = {
       
       tags: ["Samples", "Patches", "303-ish"],
       links: [
-        { label: "Download", href: "https://androidacid.com/software.html" },
-        { label: "Source", href: "https://github.com/AndroidAcid/AndroidAcid.github.io" }
+        { label: "Get it HERE", href: "#"},
       ]
     },
     {
@@ -55,7 +54,8 @@ const CONFIG = {
       
       tags: ["Games", "Javascript", "Old-Skool"],
       links: [
-        { label: "Get it", href: "#" }
+        { label: "Download", href: "https://androidacid.com/software.html" },
+        { label: "Source", href: "https://github.com/AndroidAcid/AndroidAcid.github.io"},
       ]
     }
   ],
