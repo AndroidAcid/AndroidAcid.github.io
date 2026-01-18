@@ -490,3 +490,19 @@ input:focus{
   text-shadow: 0 0 18px rgba(255,120,20,0.4);
 }
 
+/* ===== JPG banner ===== */
+.site-banner-image {
+  width: 100%;
+  border-bottom: 1px solid rgba(0, 255, 102, 0.25);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.site-banner-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  object-fit: cover;
+}
+
+
