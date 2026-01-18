@@ -13,8 +13,16 @@ const CONFIG = {
         { label: "Open on SoundCloud", href: "https://soundcloud.com/rgbelasco/" }
       ]
     },
-    // Add more tracks / playlists here
-    // { title:"...", desc:"...", tags:["..."], embedUrl:"...", links:[{label:"...",href:"..."}] }
+    {
+      title: "Band Camp",
+      desc: "Acid / Minimal Wave",
+      tags: ["Acid", "Minimal Wave", "Live"],
+      // SoundCloud embed: swap to any track/playlist embed URL you want
+      embedUrl: "https://bandcamp.com/EmbeddedPlayer/track=870727442/size=large/bgcol=ffffff/linkcol=0687f5/tracklist=false/transparent=true/",
+      links: [
+        { label: "Open on Bandcamp", href: "https://androidacid.bandcamp.com/" }
+      ]
+    },
   ],
 
   software: [
