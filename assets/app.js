@@ -43,7 +43,7 @@ const CONFIG = {
     {
       name: "Games",
       version: "2026.01",
-      desc: "",
+      desc: "Javascript Games",
       
       tags: ["Games", "Javascript", "Old-Skool"],
       links: [
