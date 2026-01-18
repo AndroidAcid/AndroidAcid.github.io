@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Neon Breakout</title>
+  <style>
+    :root {
+      --bg: #05060a;
+      --ui: #d7f7ff;
+      --muted: rgba(215,247,255,0.65);
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: radial-gradient(1200px 800px at 50% 65%, #070a14 0%, #04050a 55%, #020308 100%);
+      overflow: hidden;
+    }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    .hud {
+      position: fixed;
+      left: 16px; top: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: var(--ui);
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      text-shadow: 0 0 12px rgba(0,255,255,.35);
+      user-select: none;
+      pointer-events: none;
+      display: flex;
+      gap: 18px;
+      align-items: center;
+    }
+    .hud span b { color: #fff; font-weight: 700; }
+    .hint {
+      position: fixed;
+      right: 16px; top: 14px;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      user-select: none;
+      pointer-events: none;
+      text-shadow: 0 0 10px rgba(0,255,255,.25);
+      text-align: right;
+      line-height: 1.25;
+    }
+    .centerMsg {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      user-select: none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: rgba(215,247,255,0.92);
+      text-shadow: 0 0 24px rgba(0,255,255,.35), 0 0 60px rgba(255,0,255,.18);
+      letter-spacing: 1px;
+      text-align: center;
+      padding: 24px;
+    }
+    .centerMsg .title { font-size: 22px; margin-bottom: 10px; }
+    .centerMsg .sub { font-size: 13px; color: rgba(215,247,255,0.7); max-width: 620px; }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <span>SCORE <b id="score">0</b></span>
+    <span>LIVES <b id="lives">3</b></span>
+    <span>LEVEL <b id="level">1</b></span>
+  </div>
+  <div class="hint">
+    Move: <b>← →</b> or <b>A D</b> / Mouse / Touch<br/>
+    Launch: <b>Space</b> &nbsp; Restart: <b>R</b> &nbsp; Pause: <b>P</b>
+  </div>
+  <div class="centerMsg" id="msg" style="display:grid;">
+    <div>
+      <div class="title">NEON BREAKOUT</div>
+      <div class="sub">Press <b>Space</b> to launch. Keep the ball alive. Break everything. Be cooler than physics.</div>
+    </div>
+  </div>
+  <canvas id="c"></canvas>
+
+<script>
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+
+  // HUD
+  const scoreEl = document.getElementById("score");
+  const livesEl = document.getElementById("lives");
+  const levelEl = document.getElementById("level");
+  const msgEl = document.getElementById("msg");
+
+  // Virtual game space
+  const VW = 900, VH = 600;
+  let cw = 0, ch = 0, scale = 1, ox = 0, oy = 0;
+
+  function resize() {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    canvas.style.width = "100vw";
+    canvas.style.height = "100vh";
+
+    const sx = canvas.width / VW;
+    const sy = canvas.height / VH;
+    scale = Math.min(sx, sy);
+    cw = VW * scale;
+    ch = VH * scale;
+    ox = (canvas.width - cw) / 2;
+    oy = (canvas.height - ch) / 2;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // Helpers
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  // Input (fixed)
+  const input = {
+    left: false,
+    right: false,
+    launch: false,
+  };
+
+  let paused = false;
+
+  // Prevent default ONLY for the keys we care about (keeps browser sane)
+  function shouldBlock(e) {
+    return (
+      e.code === "ArrowLeft" || e.code === "ArrowRight" ||
+      e.code === "KeyA" || e.code === "KeyD" ||
+      e.code === "Space" || e.code === "KeyP" || e.code === "KeyR"
+    );
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if (shouldBlock(e)) e.preventDefault();
+
+    switch (e.code) {
+      case "ArrowLeft":
+      case "KeyA":
+        input.left = true;
+        break;
+      case "ArrowRight":
+      case "KeyD":
+        input.right = true;
+        break;
+      case "Space":
+        input.launch = true;
+        break;
+      case "KeyP":
+        paused = !paused;
+        break;
+      case "KeyR":
+        hardReset();
+        break;
+    }
+  }, { passive: false });
+
+  window.addEventListener("keyup", (e) => {
+    if (shouldBlock(e)) e.preventDefault();
+
+    switch (e.code) {
+      case "ArrowLeft":
+      case "KeyA":
+        input.left = false;
+        break;
+      case "ArrowRight":
+      case "KeyD":
+        input.right = false;
+        break;
+      case "Space":
+        input.launch = false;
+        break;
+    }
+  }, { passive: false });
+
+  // If the tab loses focus, release keys (fixes “stuck key” + “keys stop working”)
+  window.addEventListener("blur", () => {
+    input.left = input.right = input.launch = false;
+  });
+
+  // Pointer control
+  let pointerX = VW / 2;
+  let pointerActive = false;
+
+  function setPointerFromEvent(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = canvas.width / rect.width;
+    const x = (clientX - rect.left) * dpr;
+
+    const vx = (x - ox) / scale;
+    pointerX = clamp(vx, 0, VW);
+  }
+
+  window.addEventListener("mousemove", (e) => {
+    pointerActive = true;
+    setPointerFromEvent(e.clientX, e.clientY);
+  });
+
+  window.addEventListener("mousedown", (e) => {
+    pointerActive = true;
+    setPointerFromEvent(e.clientX, e.clientY);
+
+    if (state === "intro") startRound();
+    if (state === "serving") launchBall();
+    if (state === "levelclear") advanceLevel();
+  });
+
+  window.addEventListener("touchstart", (e) => {
+    pointerActive = true;
+    const t = e.touches[0];
+    setPointerFromEvent(t.clientX, t.clientY);
+
+    if (state === "intro") startRound();
+    if (state === "serving") launchBall();
+    if (state === "levelclear") advanceLevel();
+  }, { passive: true });
+
+  window.addEventListener("touchmove", (e) => {
+    const t = e.touches[0];
+    setPointerFromEvent(t.clientX, t.clientY);
+  }, { passive: true });
+
+  // Game objects
+  const paddle = {
+    x: VW / 2,
+    y: VH - 42,
+    w: 140,
+    h: 16,
+    vx: 0
+  };
+
+  const ball = {
+    x: VW / 2,
+    y: paddle.y - 18,
+    r: 8,
+    vx: 0,
+    vy: 0,
+    speed: 460
+  };
+
+  // Visual trails
+  const trail = [];
+  const TRAIL_MAX = 22;
+
+  // Particles
+  const particles = [];
+  function spawnBurst(x, y, n, hueBias = 0) {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, Math.PI * 2);
+      const sp = rand(80, 420);
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        life: rand(0.25, 0.6),
+        t: 0,
+        r: rand(1.5, 3.8),
+        hue: (200 + hueBias + rand(-25, 25)) % 360
+      });
+    }
+  }
+
+  // Bricks
+  let bricks = [];
+  function makeLevel(level) {
+    const rows = 6 + Math.min(3, Math.floor((level - 1) / 2));
+    const cols = 11;
+    const gap = 10;
+    const marginX = 56;
+    const marginTop = 76;
+    const bw = (VW - marginX * 2 - gap * (cols - 1)) / cols;
+    const bh = 22;
+
+    bricks = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        // FIX: no missing bricks / holes
+        const x = marginX + c * (bw + gap);
+        const y = marginTop + r * (bh + gap);
+        const hp = 1 + (r % 3 === 0 ? 1 : 0); // some tougher rows
+        bricks.push({
+          x, y, w: bw, h: bh,
+          hp,
+          hue: (190 + r * 12 + c * 4 + level * 10) % 360,
+          alive: true
+        });
+      }
+    }
+  }
+
+  // State
+  let score = 0;
+  let lives = 3;
+  let level = 1;
+  let state = "intro"; // intro | serving | playing | levelclear | gameover
+
+  function updateHUD() {
+    scoreEl.textContent = String(score);
+    livesEl.textContent = String(lives);
+    levelEl.textContent = String(level);
+  }
+
+  function showMsg(show, title, sub) {
+    msgEl.style.display = show ? "grid" : "none";
+    if (!show) return;
+    msgEl.querySelector(".title").innerHTML = title;
+    msgEl.querySelector(".sub").innerHTML = sub;
+  }
+
+  function startRound() {
+    showMsg(false);
+    state = "serving";
+
+    paddle.x = VW / 2;
+    paddle.vx = 0;
+
+    ball.x = paddle.x;
+    ball.y = paddle.y - 18;
+    ball.vx = 0;
+    ball.vy = 0;
+
+    // consume “held space”
+    input.launch = false;
+  }
+
+  function launchBall() {
+    if (state !== "serving") return;
+    state = "playing";
+    const angle = rand(-Math.PI * 0.75, -Math.PI * 0.25);
+    ball.vx = Math.cos(angle) * ball.speed;
+    ball.vy = Math.sin(angle) * ball.speed;
+    input.launch = false;
+  }
+
+  function advanceLevel() {
+    makeLevel(level);
+    startRound();
+    input.launch = false;
+  }
+
+  function hardReset() {
+    score = 0;
+    lives = 3;
+    level = 1;
+    makeLevel(level);
+    updateHUD();
+    state = "intro";
+    paused = false;
+    trail.length = 0;
+    particles.length = 0;
+    input.left = input.right = input.launch = false;
+    showMsg(true, "NEON BREAKOUT", 'Press <b>Space</b> to launch. Keep the ball alive. Break everything. Be cooler than physics.');
+  }
+
+  // Collisions
+  function circleRectCollision(cx, cy, cr, rx, ry, rw, rh) {
+    const nx = clamp(cx, rx, rx + rw);
+    const ny = clamp(cy, ry, ry + rh);
+    const dx = cx - nx;
+    const dy = cy - ny;
+    return (dx * dx + dy * dy) <= cr * cr;
+  }
+
+  function reflectBallOnRect(rect, boost = 1.0) {
+    const cx = ball.x, cy = ball.y;
+    const rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
+
+    const left = cx - rx;
+    const right = (rx + rw) - cx;
+    const top = cy - ry;
+    const bottom = (ry + rh) - cy;
+
+    const minX = Math.min(left, right);
+    const minY = Math.min(top, bottom);
+
+    if (minX < minY) {
+      ball.vx = -ball.vx;
+      ball.x += (left < right) ? -(ball.r + 1) : (ball.r + 1);
+    } else {
+      ball.vy = -ball.vy;
+      ball.y += (top < bottom) ? -(ball.r + 1) : (ball.r + 1);
+    }
+
+    const sp = Math.hypot(ball.vx, ball.vy);
+    const target = clamp(sp * boost, 320, 780);
+    const k = target / (sp || 1);
+    ball.vx *= k; ball.vy *= k;
+  }
+
+  // Drawing neon primitives
+  function withGlow(fn, glowColor, blur, alpha = 1) {
+    ctx.save();
+    ctx.globalAlpha *= alpha;
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = blur;
+    fn();
+    ctx.restore();
+  }
+
+  function drawRoundedRect(x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
+
+  function drawBackground(t) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#02030a";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.setTransform(scale, 0, 0, scale, ox, oy);
+
+    const g = ctx.createRadialGradient(VW * 0.5, VH * 0.7, 40, VW * 0.5, VH * 0.7, 520);
+    g.addColorStop(0, "rgba(0,255,255,0.08)");
+    g.addColorStop(0.4, "rgba(255,0,255,0.06)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, VW, VH);
+
+    // Scanlines
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = "#ffffff";
+    for (let y = 0; y < VH; y += 4) ctx.fillRect(0, y, VW, 1);
+    ctx.restore();
+
+    // Vignette
+    ctx.save();
+    const v = ctx.createRadialGradient(VW * 0.5, VH * 0.6, 220, VW * 0.5, VH * 0.6, 760);
+    v.addColorStop(0, "rgba(0,0,0,0)");
+    v.addColorStop(1, "rgba(0,0,0,0.75)");
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, VW, VH);
+    ctx.restore();
+
+    // Shimmer bar
+    const barY = (Math.sin(t * 0.7) * 0.5 + 0.5) * VH * 0.6 + 60;
+    ctx.save();
+    ctx.globalAlpha = 0.06;
+    const sh = ctx.createLinearGradient(0, barY - 40, 0, barY + 40);
+    sh.addColorStop(0, "rgba(0,255,255,0)");
+    sh.addColorStop(0.5, "rgba(0,255,255,1)");
+    sh.addColorStop(1, "rgba(0,255,255,0)");
+    ctx.fillStyle = sh;
+    ctx.fillRect(0, barY - 40, VW, 80);
+    ctx.restore();
+  }
+
+  function drawPaddle() {
+    const x = paddle.x - paddle.w / 2;
+    const y = paddle.y - paddle.h / 2;
+
+    withGlow(() => {
+      ctx.fillStyle = "rgba(0,255,255,0.35)";
+      drawRoundedRect(x, y, paddle.w, paddle.h, 10);
+      ctx.fill();
+    }, "rgba(0,255,255,0.8)", 22);
+
+    withGlow(() => {
+      ctx.fillStyle = "rgba(215,247,255,0.95)";
+      drawRoundedRect(x + 3, y + 3, paddle.w - 6, paddle.h - 6, 8);
+      ctx.fill();
+    }, "rgba(255,0,255,0.35)", 14, 0.9);
+
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = "rgba(0,255,255,0.75)";
+    ctx.lineWidth = 2;
+    drawRoundedRect(x + 1, y + 1, paddle.w - 2, paddle.h - 2, 9);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawBall() {
+    for (let i = 0; i < trail.length; i++) {
+      const p = trail[i];
+      const a = (i + 1) / trail.length;
+      withGlow(() => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, ball.r * lerp(0.4, 1.0, a), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0,255,255,${0.05 + a * 0.12})`;
+        ctx.fill();
+      }, "rgba(0,255,255,0.6)", 18 * a, 0.9);
+    }
+
+    withGlow(() => {
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.96)";
+      ctx.fill();
+    }, "rgba(0,255,255,0.85)", 18);
+
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = "rgba(255,0,255,0.35)";
+    ctx.beginPath();
+    ctx.arc(ball.x - ball.r * 0.35, ball.y - ball.r * 0.35, ball.r * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBricks() {
+    for (const b of bricks) {
+      if (!b.alive) continue;
+
+      const hp = b.hp;
+      const hue = b.hue;
+      const glow = `hsla(${hue}, 95%, 60%, 0.9)`;
+      const fill = `hsla(${hue}, 95%, 55%, ${hp === 1 ? 0.30 : 0.22})`;
+      const core = `hsla(${hue}, 98%, 92%, 0.85)`;
+
+      withGlow(() => {
+        ctx.fillStyle = fill;
+        drawRoundedRect(b.x, b.y, b.w, b.h, 8);
+        ctx.fill();
+      }, glow, 18);
+
+      withGlow(() => {
+        ctx.fillStyle = core;
+        drawRoundedRect(b.x + 4, b.y + 4, b.w - 8, b.h - 8, 6);
+        ctx.fill();
+      }, "rgba(255,0,255,0.25)", 10, 0.75);
+
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = `hsla(${hue}, 100%, 70%, 0.9)`;
+      ctx.lineWidth = 2;
+      drawRoundedRect(b.x + 1.5, b.y + 1.5, b.w - 3, b.h - 3, 7);
+      ctx.stroke();
+      ctx.restore();
+
+      if (hp > 1) {
+        ctx.save();
+        ctx.globalAlpha = 0.75;
+        ctx.fillStyle = `hsla(${hue}, 100%, 70%, 0.65)`;
+        ctx.fillRect(b.x + 8, b.y + b.h - 6, (b.w - 16) * (hp / 3), 2);
+        ctx.restore();
+      }
+    }
+  }
+
+  function drawParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.t += dt;
+      const k = p.t / p.life;
+      if (k >= 1) { particles.splice(i, 1); continue; }
+
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= Math.pow(0.08, dt);
+      p.vy *= Math.pow(0.08, dt);
+
+      const a = (1 - k);
+      const col = `hsla(${p.hue}, 100%, 65%, ${0.12 + a * 0.55})`;
+
+      withGlow(() => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * (0.7 + a * 0.6), 0, Math.PI * 2);
+        ctx.fillStyle = col;
+        ctx.fill();
+      }, col, 12 * a, 0.9);
+    }
+  }
+
+  // Loop
+  let last = performance.now();
+
+  makeLevel(level);
+  updateHUD();
+
+  function step(now) {
+    const dtRaw = Math.min(0.033, (now - last) / 1000);
+    last = now;
+
+    if (!paused) update(dtRaw);
+    render(now / 1000, dtRaw);
+
+    requestAnimationFrame(step);
+  }
+
+  function update(dt) {
+    // keyboard direction
+    let dir = 0;
+    if (input.left) dir -= 1;
+    if (input.right) dir += 1;
+
+    const targetX = pointerActive ? pointerX : paddle.x + dir * 520 * dt;
+    paddle.x = clamp(
+      lerp(paddle.x, targetX, pointerActive ? 0.22 : 0.55),
+      paddle.w / 2 + 8,
+      VW - paddle.w / 2 - 8
+    );
+
+    // Space behavior per state (fixed + reliable)
+    if (input.launch) {
+      if (state === "intro") startRound();
+      else if (state === "serving") launchBall();
+      else if (state === "levelclear") advanceLevel();
+      // consume tap
+      input.launch = false;
+    }
+
+    if (state === "serving") {
+      ball.x = paddle.x;
+      ball.y = paddle.y - 18;
+      return;
+    }
+
+    if (state !== "playing") return;
+
+    // Trail
+    trail.unshift({ x: ball.x, y: ball.y });
+    if (trail.length > TRAIL_MAX) trail.pop();
+
+    // Integrate
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+
+    // Walls
+    if (ball.x - ball.r < 0) { ball.x = ball.r; ball.vx = Math.abs(ball.vx); spawnBurst(ball.x, ball.y, 10, 0); }
+    if (ball.x + ball.r > VW) { ball.x = VW - ball.r; ball.vx = -Math.abs(ball.vx); spawnBurst(ball.x, ball.y, 10, 0); }
+    if (ball.y - ball.r < 0) { ball.y = ball.r; ball.vy = Math.abs(ball.vy); spawnBurst(ball.x, ball.y, 10, 80); }
+
+    // Paddle collision
+    const px = paddle.x - paddle.w / 2;
+    const py = paddle.y - paddle.h / 2;
+    if (circleRectCollision(ball.x, ball.y, ball.r, px, py, paddle.w, paddle.h) && ball.vy > 0) {
+      const hit = (ball.x - paddle.x) / (paddle.w / 2);
+      const maxAngle = Math.PI * 0.42;
+      const angle = (-Math.PI / 2) + hit * maxAngle;
+      const sp = clamp(Math.hypot(ball.vx, ball.vy) * 1.02, 360, 820);
+      ball.vx = Math.cos(angle) * sp;
+      ball.vy = Math.sin(angle) * sp;
+
+      ball.y = py - ball.r - 0.5;
+      spawnBurst(ball.x, ball.y, 18, 40);
+    }
+
+    // Bricks
+    let remaining = 0;
+    for (const b of bricks) {
+      if (!b.alive) continue;
+      remaining++;
+
+      if (circleRectCollision(ball.x, ball.y, ball.r, b.x, b.y, b.w, b.h)) {
+        b.hp -= 1;
+        score += 50;
+        if (b.hp <= 0) { b.alive = false; score += 80; spawnBurst(ball.x, ball.y, 38, 120); }
+        else spawnBurst(ball.x, ball.y, 18, -40);
+
+        reflectBallOnRect(b, 1.01);
+        updateHUD();
+        break;
+      }
+    }
+
+    // Win
+    if (remaining === 0) {
+      state = "levelclear";
+      level += 1;
+      updateHUD();
+      showMsg(true, "LEVEL CLEAR", 'Press <b>Space</b> to continue the neon rampage.');
+    }
+
+    // Lose
+    if (ball.y - ball.r > VH + 40) {
+      lives -= 1;
+      updateHUD();
+      spawnBurst(ball.x, VH - 20, 30, 200);
+      trail.length = 0;
+
+      if (lives <= 0) {
+        state = "gameover";
+        showMsg(true, "GAME OVER", `Press <b>R</b> to restart. Your score: <b>${score}</b>.`);
+      } else {
+        state = "serving";
+      }
+    }
+  }
+
+  function render(t, dt) {
+    drawBackground(t);
+
+    // Frame
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.strokeStyle = "rgba(0,255,255,0.6)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(8, 8, VW - 16, VH - 16);
+    ctx.restore();
+
+    drawBricks();
+    drawPaddle();
+    drawBall();
+    drawParticles(dt);
+
+    // Pause overlay
+    if (paused) {
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, VW, VH);
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = "rgba(215,247,255,0.95)";
+      ctx.font = "22px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("PAUSED", VW / 2, VH / 2 - 6);
+      ctx.font = "13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace";
+      ctx.globalAlpha = 0.7;
+      ctx.fillText("Press P to resume", VW / 2, VH / 2 + 18);
+      ctx.restore();
+    }
+
+    // Serving hint ring
+    if (state === "serving") {
+      const pulse = (Math.sin(t * 4) * 0.5 + 0.5);
+      ctx.save();
+      ctx.globalAlpha = 0.35 + pulse * 0.35;
+      ctx.strokeStyle = "rgba(255,0,255,0.85)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, 18 + pulse * 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  hardReset();
+  requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>
+
