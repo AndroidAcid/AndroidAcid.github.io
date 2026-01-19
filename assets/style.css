@@ -510,6 +510,6 @@ input:focus{
 .site-banner-image img {
   display: block;
   width: 1600px;   /* exact image width */
-  height: 400px;   /* exact image height */
+  height: 1024px;   /* exact image height */
   margin: 0 auto;
 }
