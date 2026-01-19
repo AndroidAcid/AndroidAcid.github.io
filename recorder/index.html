@@ -1,13 +1,249 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>acid-recorder</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Acid Recorder</title>
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#39FF14" />
+
+  <style>
+    :root{
+      --acid:#39FF14;
+      --bg:#060606;
+      --panel:#0b0b0b;
+      --line:rgba(57,255,20,.35);
+      --text:rgba(57,255,20,.92);
+      --muted:rgba(57,255,20,.70);
+      --danger:#ff2bd6;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(1200px 800px at 20% 10%, rgba(57,255,20,.12), transparent 55%),
+                  radial-gradient(900px 700px at 85% 40%, rgba(57,255,20,.08), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+    .wrap{
+      width:min(760px, 100%);
+      border:1px solid var(--line);
+      background: linear-gradient(180deg, rgba(57,255,20,.06), rgba(57,255,20,.02));
+      border-radius:20px;
+      box-shadow: 0 0 0 1px rgba(57,255,20,.12) inset,
+                  0 10px 50px rgba(0,0,0,.6);
+      overflow:hidden;
+    }
+    header{
+      padding:18px 18px 12px;
+      border-bottom:1px solid var(--line);
+      background: rgba(0,0,0,.35);
+      display:flex;
+      gap:12px;
+      align-items:flex-end;
+      justify-content:space-between;
+      flex-wrap:wrap;
+    }
+    h1{
+      margin:0;
+      font-size:20px;
+      letter-spacing:.5px;
+      text-transform:uppercase;
+    }
+    .sub{
+      margin-top:6px;
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.3;
+    }
+    main{ padding:18px; display:grid; gap:14px; }
+    .panel{
+      padding:14px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.35);
+      border-radius:16px;
+    }
+    .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    button{
+      appearance:none;
+      border:1px solid var(--line);
+      background: rgba(57,255,20,.10);
+      color:var(--text);
+      padding:12px 14px;
+      border-radius:14px;
+      font-weight:700;
+      letter-spacing:.4px;
+      text-transform:uppercase;
+      cursor:pointer;
+      transition: transform .06s ease, background .15s ease, border-color .15s ease, filter .15s ease;
+      user-select:none;
+      touch-action: manipulation;
+    }
+    button:hover{ background: rgba(57,255,20,.16); border-color: rgba(57,255,20,.6); }
+    button:active{ transform: translateY(1px); }
+    button[disabled]{ opacity:.45; cursor:not-allowed; }
+
+    .danger{
+      border-color: rgba(255,43,214,.55);
+      background: rgba(255,43,214,.10);
+      color: rgba(255,43,214,.9);
+    }
+    .danger:hover{ background: rgba(255,43,214,.14); border-color: rgba(255,43,214,.8); }
+
+    .hold{
+      position: relative;
+      min-width: 180px;
+    }
+    .hold.isRecording{
+      filter: drop-shadow(0 0 18px rgba(57,255,20,.45));
+      border-color: rgba(57,255,20,.9);
+      background: rgba(57,255,20,.22);
+    }
+    .hold small{
+      display:block;
+      opacity:.8;
+      margin-top:2px;
+      font-weight:600;
+      letter-spacing:.2px;
+      text-transform:none;
+      font-size:11px;
+      color:var(--muted);
+    }
+
+    .meter{
+      height:10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.55);
+      overflow:hidden;
+    }
+    .bar{
+      height:100%;
+      width:0%;
+      background: linear-gradient(90deg, rgba(57,255,20,.55), rgba(57,255,20,.95));
+      filter: drop-shadow(0 0 10px rgba(57,255,20,.45));
+      transition: width 80ms linear;
+    }
+    .status{
+      font-size:13px;
+      color:var(--muted);
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .tag{
+      border:1px solid var(--line);
+      padding:6px 10px;
+      border-radius:999px;
+      background: rgba(0,0,0,.35);
+      color:var(--muted);
+      font-size:12px;
+      white-space:nowrap;
+    }
+
+    label{
+      font-size:12px;
+      color:var(--muted);
+      display:block;
+      margin-bottom:6px;
+      text-transform:uppercase;
+      letter-spacing:.35px;
+      font-weight:700;
+    }
+    input[type="text"]{
+      width:min(320px, 100%);
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.45);
+      color: var(--text);
+      outline:none;
+    }
+    input[type="text"]::placeholder{ color: rgba(57,255,20,.45); }
+
+    canvas{
+      width:100%;
+      height:160px;
+      display:block;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.55);
+      box-shadow: 0 0 0 1px rgba(57,255,20,.10) inset;
+    }
+
+    .note{ font-size:12px; color:var(--muted); line-height:1.35; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Acid Recorder</h1>
+        <div class="sub">Live waveform • session labels • hold-to-record</div>
+      </div>
+      <div class="tag" id="srTag">— Hz</div>
+    </header>
+
+    <main>
+      <div class="panel">
+        <div class="row" style="justify-content:space-between;">
+          <div>
+            <label for="sessionLabel">Session label</label>
+            <input id="sessionLabel" type="text" placeholder="e.g. kitchen_test, interview_mom, ufo_sighting" maxlength="40" />
+          </div>
+          <div class="row" style="align-items:flex-end;">
+            <button id="btnStart">Start</button>
+            <button id="btnStop" class="danger" disabled>Stop</button>
+            <button id="btnSave" disabled>Save WAV</button>
+          </div>
+        </div>
+
+        <div style="margin-top:14px;">
+          <canvas id="scope" width="1200" height="320" aria-label="waveform"></canvas>
+
+          <div style="margin-top:12px;">
+            <div class="meter">
+              <div class="bar" id="levelBar"></div>
+            </div>
+            <div class="status" style="margin-top:10px;">
+              <div id="statusText">Idle. Tap Start (or hold the Walkie button) and allow microphone.</div>
+              <div id="timeText">00:00</div>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:12px;">
+            <button id="btnHold" class="hold">
+              Walkie-Talkie
+              <small>press & hold to record</small>
+            </button>
+            <span class="tag" id="fmtTag">WAV • 16-bit PCM • mono</span>
+            <span class="tag" id="nameTag">filename: —</span>
+          </div>
+
+          <p class="note" style="margin-top:12px;">
+            Pro tip: Hold-to-record is great for “notes to future me” and “what is that noise?” investigations.
+          </p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="note">
+          <b>Install as app:</b> Chrome → (⋮) → <i>Add to Home screen</i>.<br/>
+          Audio stays on-device. Saving uses a file picker when supported; otherwise it downloads to your device.
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
 </html>
