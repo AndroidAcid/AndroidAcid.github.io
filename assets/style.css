@@ -503,13 +503,16 @@ input:focus{
 
 .site-banner-image {
   width: 100%;
-  overflow-x: auto;
+  height: 800px; /* LOCKED height */
+  overflow: hidden;
+  border-bottom: 1px solid rgba(0, 255, 102, 0.25);
   background: #000;
 }
 
 .site-banner-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;      /* crop instead of resize */
+  object-position: center;
   display: block;
-  width: 1600px;   /* exact image width */
-  height: 1024px;   /* exact image height */
-  margin: 0 auto;
 }
