@@ -179,7 +179,18 @@ code{ font-family: var(--mono); color: rgba(0,255,102,0.9); }
 .btn-ghost{
   background: rgba(0,0,0,0.28);
 }
+.site-banner-image {
+  width: 100%;
+  overflow-x: auto;
+  background: #000;
+}
 
+.site-banner-image img {
+  display: block;
+  width: 1600px;   /* exact image width */
+  height: 400px;   /* exact image height */
+  margin: 0 auto;
+}
 .chips{
   display:flex;
   flex-wrap: wrap;
@@ -490,7 +501,6 @@ input:focus{
   text-shadow: 0 0 18px rgba(255,120,20,0.4);
 }
 
-/* ===== JPG banner ===== */
 .site-banner-image {
   width: 100%;
   overflow-x: auto;
@@ -502,5 +512,4 @@ input:focus{
   width: 1600px;   /* exact image width */
   height: 400px;   /* exact image height */
   margin: 0 auto;
-}ay: block;
 }
