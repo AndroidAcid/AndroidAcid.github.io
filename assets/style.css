@@ -503,7 +503,7 @@ input:focus{
 
 .site-banner-image {
   width: 100%;
-  height: 70%%; /* LOCKED height */
+  height: 320px; /* LOCKED height */
   overflow: hidden;
   border-bottom: 1px solid rgba(0, 255, 102, 0.25);
   background: #000;
@@ -511,8 +511,9 @@ input:focus{
 
 .site-banner-image img {
   width: 100%;
-  height: 70%;
+  height: 100%;
   object-fit: cover;      /* crop instead of resize */
   object-position: center;
   display: block;
 }
+
