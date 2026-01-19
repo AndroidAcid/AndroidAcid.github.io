@@ -511,7 +511,7 @@ input:focus{
 
 .site-banner-image img {
   width: 100%;
-  height: 100%;
+  height: 75%%;
   object-fit: cover;      /* crop instead of resize */
   object-position: center;
   display: block;
