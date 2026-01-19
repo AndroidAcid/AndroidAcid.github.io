@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>EMF Meter (Magnetometer) PWA</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b1220; color:#e6edf6; }
+    header { padding: 16px 18px; border-bottom: 1px solid #223; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    h1 { font-size: 16px; margin: 0; letter-spacing: .2px; }
+    main { padding: 18px; max-width: 900px; margin: 0 auto; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    button {
+      background:#1f6feb; color:white; border:0; border-radius: 12px; padding: 10px 14px;
+      font-weight: 600; cursor: pointer;
+    }
+    button.secondary { background:#233; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .card {
+      background:#0f172a; border:1px solid #223; border-radius: 16px; padding: 14px; margin-top: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; }
+    .metric { padding: 12px; border:1px solid #223; border-radius: 14px; background:#0b1220; }
+    .label { opacity:.75; font-size: 12px; margin-bottom: 6px; }
+    .value { font-size: 22px; font-variant-numeric: tabular-nums; }
+    .small { opacity:.8; font-size: 12px; line-height: 1.4; }
+    canvas { width: 100%; height: 220px; display:block; border-radius: 14px; border:1px solid #223; background:#050814; }
+    code { background:#121b33; padding: 2px 6px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>EMF Meter (Magnetometer)</h1>
+    <div class="row">
+      <button id="btnStart">Start</button>
+      <button id="btnStop" class="secondary" disabled>Stop</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="small" id="status">
+        Waiting. Tip: this usually works on Android Chrome/Edge. iOS tends to say “nope”.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div class="metric">
+          <div class="label">Magnitude (µT)</div>
+          <div class="value" id="mag">—</div>
+        </div>
+        <div class="metric">
+          <div class="label">X (µT)</div>
+          <div class="value" id="x">—</div>
+        </div>
+        <div class="metric">
+          <div class="label">Y (µT)</div>
+          <div class="value" id="y">—</div>
+        </div>
+        <div class="metric">
+          <div class="label">Z (µT)</div>
+          <div class="value" id="z">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Live Magnitude Graph (µT)</div>
+      <canvas id="chart" width="900" height="220"></canvas>
+      <div class="small" style="margin-top:10px;">
+        Note: This is magnetic field strength from the phone’s sensor, not a universal “EMF” detector.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Quick sanity check</div>
+      <div class="small">
+        Put a small magnet near the phone. You should see the magnitude spike.
+        If nothing changes, your device/browser likely doesn’t expose the magnetometer API.
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
