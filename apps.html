@@ -1,1 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#00ff66" />
+  <meta name="description" content="Android Acid — Software downloads." />
 
+  <title>Android Acid — Software</title>
+
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+
+  <!-- SAME HEADER -->
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <div class="brand">
+        <img class="logo" src="assets/logo.svg" alt="Android Acid logo" />
+        <div class="brand-text">
+          <div class="brand-title">ANDROID ACID</div>
+          <div class="brand-sub">Acid • Synths • Software</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a href="index.html#music">Music</a>
+        <a href="software.html" aria-current="page">Software</a>
+        <a href="index.html#studio">Studio</a>
+        <a href="index.html#contact">Contact</a>
+      </nav>
+
+      <button class="menu-btn" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="site-banner-image">
+   <img src="assets/banner.jpg" alt="Android Acid banner" />
+  </div>
+
+  <main id="content">
+    <!-- HERO (same structure, different copy) -->
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <h1 class="glow">Software</h1>
+          <p class="muted">
+            Games and experiments.  
+            Click a module to download or learn more.
+          </p>
+
+          <div class="chips">
+            <a class="btn" href="index.html">Home</a>
+            <a class="btn" href="#games">Games</a>
+          </div>
+        </div>
+
+        <div class="hero-card">
+          <div class="panel">
+            <div class="panel-top">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              <span class="panel-title">software</span>
+            </div>
+            <div class="panel-body">
+              <div class="meter">
+                <div class="meter-bar" style="--w: 72%"></div>
+                <div class="meter-bar" style="--w: 55%"></div>
+                <div class="meter-bar" style="--w: 61%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-scanline" aria-hidden="true"></div>
+    </section>
+
+    <!-- SOFTWARE GRID -->
+    <section id="games" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Downloads</h2>
+        </div>
+
+        <div class="grid">
+
+          <!-- BREAKOUT -->
+          <a class="card" href="https://androidacid.com/games/breakout.html" target="_blank" rel="noreferrer">
+            <h3>Breakout</h3>
+            <p class="muted">
+              Paddle and bricks.  
+              Fast reflex, no forgiveness.
+            </p>
+            <div class="meta">
+              <span class="pill">Game</span>
+              <span class="pill">Arcade</span>
+              <span class="pill">v1.0</span>
+            </div>
+          </a>
+
+          <!-- BLASTER -->
+          <a class="card" href="https://androidacid.com/games/blaster.html" target="_blank" rel="noreferrer">
+            <h3>Blaster</h3>
+            <p class="muted">
+              Stay alive as long as possible !
+              Contains flashing lights and strobes.
+            </p>
+            <div class="meta">
+              <span class="pill">Game</span>
+              <span class="pill">Shooter</span>
+              <span class="pill">v0.9</span>
+            </div>
+          </a>
+
+          <!-- TETRIS -->
+          <a class="card" href="https://androidacid.com/games/neon-tetris.html" target="_blank" rel="noreferrer">
+            <h3>Neon-Tetris</h3>
+            <p class="muted">
+              Falling geometry.  
+              Order versus inevitability.
+            </p>
+            <div class="meta">
+              <span class="pill">Game</span>
+              <span class="pill">Puzzle</span>
+              <span class="pill">v1.2</span>
+            </div>
+          </a>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- SAME FOOTER -->
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="muted small">© <span id="year"></span> Android Acid</div>
+      <div class="muted small">Software modules online</div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById("year").textContent =
+      new Date().getFullYear();
+  </script>
+</body>
+</html>
