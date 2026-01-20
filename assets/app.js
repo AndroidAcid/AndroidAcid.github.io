@@ -32,9 +32,9 @@ const CONFIG = {
       desc: "Coming Soon : 2026.",
       tags: ["VST3", "Windows", "Experimental"],
       links: [
-        { label: "Download", href: "#" },
+        { label: "Download", href: "https://androidacid.com/apps.html" },
         { label: "Docs", href: "#" },
-        { label: "Source", href: "#" }
+        { label: "Source", href: "https://github.com/AndroidAcid/AndroidAcid.github.io" }
       ]
     },
     {
