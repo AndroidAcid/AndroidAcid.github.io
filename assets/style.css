@@ -517,3 +517,9 @@ input:focus{
   display: block;
 }
 
+#games .grid > .card:nth-child(-n+3) {
+  border-bottom: 1px solid rgba(0, 255, 102, 0.35);
+  padding-bottom: 18px;
+}
+
+
