@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NEON BERZERK</title>
+<style>
+html,body{margin:0;height:100%;background:#03040c;overflow:hidden}
+canvas{display:block;width:100vw;height:100vh}
+#hud{
+  position:fixed;left:12px;top:10px;
+  color:#c7f9ff;font-size:14px;
+  text-shadow:0 0 14px rgba(0,255,255,.7)
+}
+#centerMsg{
+  position:fixed;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  font-size:38px;
+  color:#ff4df0;
+  text-shadow:0 0 30px rgba(255,0,255,1);
+  pointer-events:none;
+  display:none;
+  text-align:center;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="centerMsg"></div>
+
+<script>
+(() => {
+
+/* ================= SETUP ================= */
+const canvas=document.getElementById("c");
+const ctx=canvas.getContext("2d",{alpha:false});
+function resize(){
+  const dpr=Math.min(2,devicePixelRatio||1);
+  canvas.width=innerWidth*dpr;
+  canvas.height=innerHeight*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+addEventListener("resize",resize); resize();
+
+const ROOM_W=960, ROOM_H=600;
+const WALL=14, GRID=96, GAP=96;
+const PLAYER_SPEED=240, ENEMY_SPEED=55;
+const BULLET_SPEED=620, ENEMY_BULLET_SPEED=420;
+const R=14;
+
+let lives=3, gameOver=false;
+let roomHue=140;
+const HUE_STEP=60;
+
+const effects=[];
+const bullets=[];
+const keys=new Set();
+
+/* ================= COLOR ================= */
+function neon(h,s=100,l=60,a=1){
+  return `hsla(${h},${s}%,${l}%,${a})`;
+}
+
+/* ================= UI ================= */
+const msgEl=document.getElementById("centerMsg");
+function showMessage(html){
+  msgEl.innerHTML=html;
+  msgEl.style.display="block";
+}
+function hideMessage(){
+  msgEl.style.display="none";
+  msgEl.innerHTML="";
+}
+
+/* ================= INPUT ================= */
+onkeydown=e=>{
+  if(gameOver){
+    restartGame();
+    return;
+  }
+  keys.add(e.code);
+};
+onkeyup=e=>keys.delete(e.code);
+
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rand=(a,b)=>a+Math.random()*(b-a);
+const now=()=>performance.now()/1000;
+
+/* ================= GEOMETRY ================= */
+function circleRect(cx,cy,r,w){
+  const nx=clamp(cx,w.x,w.x+w.w);
+  const ny=clamp(cy,w.y,w.y+w.h);
+  return (cx-nx)**2+(cy-ny)**2 < r*r;
+}
+function rectsOverlap(a,b){
+  return !(a.x+a.w<=b.x||a.x>=b.x+b.w||a.y+a.h<=b.y||a.y>=b.y+b.h);
+}
+
+/* ================= EFFECTS ================= */
+function spawnExplosion(x,y,color){
+  effects.push({x,y,r:10,t:0,color});
+}
+function updateEffects(dt){
+  for(let i=effects.length-1;i>=0;i--){
+    const e=effects[i];
+    e.t+=dt; e.r+=260*dt;
+    if(e.t>0.6) effects.splice(i,1);
+  }
+}
+function drawEffects(){
+  for(const e of effects){
+    const a=1-e.t/0.6;
+    ctx.save();
+    ctx.globalCompositeOperation="lighter";
+    ctx.shadowColor=e.color;
+    ctx.shadowBlur=40;
+    ctx.strokeStyle=neon(roomHue,100,60,a);
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(e.x,e.y,e.r,0,Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/* ================= DRAW HELPERS ================= */
+function neonRect(x,y,w,h,c,r=6){
+  ctx.save();
+  ctx.strokeStyle=c;
+  ctx.lineWidth=2;
+  ctx.shadowColor=c;
+  ctx.shadowBlur=24;
+  ctx.beginPath();
+  ctx.roundRect(x,y,w,h,r);
+  ctx.stroke();
+  ctx.shadowBlur=0;
+  ctx.globalAlpha=.9;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBullet(b){
+  ctx.save();
+  ctx.globalCompositeOperation="lighter";
+  const h=b.friendly?roomHue:(roomHue+160)%360;
+  ctx.shadowColor=neon(h,100,65,1);
+  ctx.shadowBlur=18;
+  ctx.fillStyle=neon(h,100,75,.95);
+  ctx.beginPath();
+  ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/* ================= ROBOTS ================= */
+function drawEnemy(e){
+  const s=e.r*2;
+  const pulse=1+Math.sin(now()*4+e.x)*0.06;
+  ctx.save();
+  ctx.translate(e.x,e.y);
+  ctx.scale(pulse,pulse);
+  ctx.shadowColor=neon((roomHue+160)%360);
+  ctx.shadowBlur=22;
+  ctx.strokeStyle=neon((roomHue+180)%360,100,70,.95);
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.roundRect(-s/2,-s/2,s,s,6);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPlayer(p){
+  const ang=Math.atan2(p.fy,p.fx);
+  ctx.save();
+  ctx.translate(p.x,p.y);
+  ctx.rotate(ang);
+  ctx.shadowColor=neon((roomHue+20)%360);
+  ctx.shadowBlur=28;
+  ctx.strokeStyle=neon((roomHue+40)%360,100,85,.95);
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(14,0);
+  ctx.lineTo(-10,-10);
+  ctx.lineTo(-14,-6);
+  ctx.lineTo(-14,6);
+  ctx.lineTo(-10,10);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* ================= WALLS ================= */
+function buildBorderWalls(exitsOpen){
+  const w=[],mx=ROOM_W/2,my=ROOM_H/2,g=exitsOpen?GAP:0;
+  const wall=(x,y,wid,hei)=>w.push({x,y,w:wid,h:hei});
+  if(!exitsOpen) wall(0,0,ROOM_W,WALL);
+  else{ wall(0,0,mx-g/2,WALL); wall(mx+g/2,0,mx-g/2,WALL); }
+  if(!exitsOpen) wall(0,ROOM_H-WALL,ROOM_W,WALL);
+  else{ wall(0,ROOM_H-WALL,mx-g/2,WALL); wall(mx+g/2,ROOM_H-WALL,mx-g/2,WALL); }
+  if(!exitsOpen) wall(0,0,WALL,ROOM_H);
+  else{ wall(0,0,WALL,my-g/2); wall(0,my+g/2,WALL,my-g/2); }
+  if(!exitsOpen) wall(ROOM_W-WALL,0,WALL,ROOM_H);
+  else{ wall(ROOM_W-WALL,0,WALL,my-g/2); wall(ROOM_W-WALL,my+g/2,WALL,my-g/2); }
+  return w;
+}
+
+function generateInnerWalls(blockers){
+  const w=[],sh=4+Math.floor(Math.random()*3);
+  let placed=0,tries=0;
+  while(placed<sh&&tries++<220){
+    const gx=Math.floor(rand(2,8))*GRID;
+    const gy=Math.floor(rand(2,6))*GRID;
+    const t=Math.floor(Math.random()*4),p=[];
+    if(t===0)p.push({x:gx,y:gy,w:WALL,h:GRID*2});
+    if(t===1)p.push({x:gx,y:gy,w:GRID*2,h:WALL});
+    if(t===2){p.push({x:gx,y:gy,w:WALL,h:GRID*2});p.push({x:gx,y:gy+GRID*2,w:GRID*2,h:WALL});}
+    if(t===3)p.push({x:gx,y:gy,w:GRID,h:GRID});
+    if(p.every(a=>!w.some(b=>rectsOverlap(a,b))&&!blockers.some(b=>rectsOverlap(a,b)))){
+      w.push(...p); placed++;
+    }
+  }
+  return w;
+}
+
+/* ================= ROOM ================= */
+function makeRoom(){
+  const borderWalls=buildBorderWalls(false);
+  const innerWalls=generateInnerWalls(borderWalls);
+  let spawn;
+  do{
+    spawn={x:rand(80,ROOM_W-80),y:rand(80,ROOM_H-80)};
+  }while([...innerWalls,...borderWalls].some(w=>circleRect(spawn.x,spawn.y,R,w)));
+  const enemies=[];
+  for(let i=0;i<6;i++){
+    let e;
+    do{
+      e={x:rand(80,ROOM_W-80),y:rand(80,ROOM_H-80)};
+    }while([...innerWalls,...borderWalls].some(w=>circleRect(e.x,e.y,R,w))||
+            Math.hypot(e.x-spawn.x,e.y-spawn.y)<140);
+    enemies.push({...e,r:R,vx:0,vy:0,dirT:0,shootT:rand(1,2.5),alive:true,active:false});
+  }
+  return{innerWalls,borderWalls,enemies,playerSpawn:spawn,exitsOpen:false};
+}
+
+/* ================= STATE ================= */
+let room=makeRoom();
+let player={...room.playerSpawn,r:R,fx:1,fy:0};
+let enemiesActivated=false,roomCount=1;
+
+function restartGame(){
+  lives=3; gameOver=false;
+  roomHue=140;
+  hideMessage();
+  room=makeRoom();
+  player={...room.playerSpawn,r:R,fx:1,fy:0};
+  bullets.length=0;
+  enemiesActivated=false; roomCount=1;
+}
+
+/* ================= MOVE ================= */
+function move(ent,dt){
+  let nx=ent.x+ent.vx*dt,ny=ent.y+ent.vy*dt;
+  for(const w of [...room.innerWalls,...room.borderWalls]){
+    if(circleRect(nx,ent.y,ent.r,w))nx=ent.x;
+    if(circleRect(ent.x,ny,ent.r,w))ny=ent.y;
+  }
+  ent.x=nx; ent.y=ny;
+}
+
+/* ================= LOOP ================= */
+let last=now();
+function loop(){
+  const t=now(),dt=Math.min(.03,t-last); last=t;
+  if(gameOver){requestAnimationFrame(loop);return;}
+
+  let ax=0,ay=0;
+  if(keys.has("ArrowLeft")||keys.has("KeyA"))ax--;
+  if(keys.has("ArrowRight")||keys.has("KeyD"))ax++;
+  if(keys.has("ArrowUp")||keys.has("KeyW"))ay--;
+  if(keys.has("ArrowDown")||keys.has("KeyS"))ay++;
+
+  if((ax||ay)&&!enemiesActivated){
+    enemiesActivated=true;
+    room.enemies.forEach(e=>e.active=true);
+  }
+
+  if(ax||ay){const m=Math.hypot(ax,ay);player.fx=ax/m;player.fy=ay/m;}
+  player.vx=ax*PLAYER_SPEED; player.vy=ay*PLAYER_SPEED;
+  move(player,dt);
+
+  if(keys.has("Space")&&!player.cool){
+    bullets.push({x:player.x,y:player.y,vx:player.fx*BULLET_SPEED,vy:player.fy*BULLET_SPEED,r:4,life:1,friendly:true});
+    player.cool=.18;
+  }
+  player.cool=Math.max(0,(player.cool||0)-dt);
+
+  for(const e of room.enemies){
+    if(!e.alive||!e.active)continue;
+    e.dirT-=dt;
+    if(e.dirT<=0){
+      e.dirT=1.6;
+      const dx=player.x-e.x,dy=player.y-e.y;
+      if(Math.abs(dx)>Math.abs(dy)){e.vx=Math.sign(dx)*ENEMY_SPEED;e.vy=0;}
+      else{e.vx=0;e.vy=Math.sign(dy)*ENEMY_SPEED;}
+    }
+    move(e,dt);
+    e.shootT-=dt;
+    if(e.shootT<=0&&Math.random()<0.5){
+      e.shootT=rand(1.5,3);
+      const dx=player.x-e.x,dy=player.y-e.y,m=Math.hypot(dx,dy)||1;
+      bullets.push({x:e.x,y:e.y,vx:dx/m*ENEMY_BULLET_SPEED,vy:dy/m*ENEMY_BULLET_SPEED,r:4,life:1,friendly:false});
+    }
+  }
+
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    b.x+=b.vx*dt; b.y+=b.vy*dt; b.life-=dt;
+    for(const w of [...room.innerWalls,...room.borderWalls])
+      if(circleRect(b.x,b.y,b.r,w)){b.vx*=-1;b.vy*=-1;}
+    if(!b.friendly&&Math.hypot(b.x-player.x,b.y-player.y)<b.r+player.r){
+      spawnExplosion(player.x,player.y,neon(roomHue));
+      bullets.splice(i,1);
+      lives--;
+      if(lives<=0){
+        gameOver=true;
+        showMessage("GAME OVER<br><span style='font-size:18px'>PRESS ANY KEY</span>");
+      }else player={...room.playerSpawn,r:R,fx:1,fy:0};
+      break;
+    }
+    if(b.friendly){
+      for(const e of room.enemies)
+        if(e.alive&&Math.hypot(b.x-e.x,b.y-e.y)<b.r+e.r){
+          spawnExplosion(e.x,e.y,neon((roomHue+160)%360));
+          e.alive=false; bullets.splice(i,1); break;
+        }
+    }
+    if(b.life<=0) bullets.splice(i,1);
+  }
+
+  updateEffects(dt);
+
+  if(!room.exitsOpen&&room.enemies.every(e=>!e.alive)){
+    room.exitsOpen=true;
+    room.borderWalls=buildBorderWalls(true);
+  }
+
+  if(room.exitsOpen&&(player.x<0||player.x>ROOM_W||player.y<0||player.y>ROOM_H)){
+    roomHue=(roomHue+HUE_STEP)%360;
+    room=makeRoom();
+    player={...room.playerSpawn,r:R,fx:1,fy:0};
+    bullets.length=0; enemiesActivated=false; roomCount++;
+  }
+
+  ctx.fillStyle="#03040c"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  const s=Math.min(innerWidth/ROOM_W,innerHeight/ROOM_H);
+  const ox=(innerWidth-ROOM_W*s)/2,oy=(innerHeight-ROOM_H*s)/2;
+  ctx.save(); ctx.translate(ox,oy); ctx.scale(s,s);
+
+  for(const w of [...room.innerWalls,...room.borderWalls])
+    neonRect(w.x,w.y,w.w,w.h,neon(roomHue,100,60,.9),6);
+  for(const e of room.enemies) if(e.alive) drawEnemy(e);
+  drawPlayer(player);
+  for(const b of bullets) drawBullet(b);
+  drawEffects();
+
+  ctx.restore();
+  document.getElementById("hud").textContent=`ROOM ${roomCount} | LIVES ${lives}`;
+  requestAnimationFrame(loop);
+}
+loop();
+
+})();
+</script>
+</body>
+</html>
+
