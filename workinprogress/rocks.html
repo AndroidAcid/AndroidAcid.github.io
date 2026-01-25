@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Space Game (JS)</title>
+  <style>
+    html, body { margin:0; height:100%; background:#000; overflow:hidden; }
+    canvas { display:block; width:100vw; height:100vh; image-rendering: pixelated; }
+    .hud {
+      position: fixed; left: 12px; top: 10px; color: #9f9;
+      font: 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-shadow: 0 0 8px rgba(0,255,0,.35);
+      user-select: none;
+      pointer-events: none;
+      line-height: 1.35;
+    }
+    .help {
+      position: fixed; right: 12px; top: 10px; color: #9f9;
+      font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      opacity: .85;
+      text-align: right;
+      user-select: none;
+      pointer-events: none;
+      line-height: 1.35;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="hud" id="hud"></div>
+  <div class="help">
+    Arrows/WASD: rotate + thrust<br/>
+    Space: shoot<br/>
+    R: restart
+  </div>
+
+<script>
+(() => {
+  // --- Canvas setup (low internal resolution for retro chunkiness) ---
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  const INTERNAL_W = 320;
+  const INTERNAL_H = 180;
+
+  function resize() {
+    canvas.width = INTERNAL_W;
+    canvas.height = INTERNAL_H;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // --- Helpers ---
+  const TAU = Math.PI * 2;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function wrap(obj) {
+    if (obj.x < 0) obj.x += INTERNAL_W;
+    if (obj.x >= INTERNAL_W) obj.x -= INTERNAL_W;
+    if (obj.y < 0) obj.y += INTERNAL_H;
+    if (obj.y >= INTERNAL_H) obj.y -= INTERNAL_H;
+  }
+
+  function dist2(ax, ay, bx, by) {
+    const dx = ax - bx, dy = ay - by;
+    return dx*dx + dy*dy;
+  }
+
+  // --- Input ---
+  const keys = new Set();
+  window.addEventListener('keydown', (e) => {
+    keys.add(e.code);
+    if (e.code === 'Space') e.preventDefault();
+    if (e.code === 'KeyR') reset();
+  });
+  window.addEventListener('keyup', (e) => keys.delete(e.code));
+
+  // --- Game state ---
+  let ship, bullets, rocks, particles;
+  let score, lives, level, gameOver;
+  let shootCooldown = 0;
+  let invuln = 0;
+
+  function makeShip() {
+    return {
+      x: INTERNAL_W/2, y: INTERNAL_H/2,
+      vx: 0, vy: 0,
+      a: -Math.PI/2,
+      r: 6
+    };
+  }
+
+  function spawnRock(size = 3) {
+    // size: 3 big, 2 medium, 1 small
+    const edge = Math.floor(rand(0,4));
+    const x = edge === 0 ? 0 : edge === 1 ? INTERNAL_W : rand(0, INTERNAL_W);
+    const y = edge === 2 ? 0 : edge === 3 ? INTERNAL_H : rand(0, INTERNAL_H);
+
+    const speed = rand(10, 30) + level * 2;
+    const ang = rand(0, TAU);
+    const radius = size === 3 ? 18 : size === 2 ? 11 : 7;
+
+    // Make slightly jagged polygon points
+    const pts = [];
+    const n = Math.floor(rand(7, 11));
+    for (let i = 0; i < n; i++) {
+      const t = (i / n) * TAU;
+      const m = rand(0.7, 1.15);
+      pts.push({ t, m });
+    }
+
+    return {
+      x, y,
+      vx: Math.cos(ang) * speed / 60,
+      vy: Math.sin(ang) * speed / 60,
+      r: radius,
+      size,
+      rot: rand(-0.02, 0.02),
+      ang: rand(0, TAU),
+      pts
+    };
+  }
+
+  function explode(x, y, count = 18) {
+    for (let i = 0; i < count; i++) {
+      const a = rand(0, TAU);
+      const s = rand(0.6, 2.2);
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s,
+        life: rand(18, 40)
+      });
+    }
+  }
+
+  function reset() {
+    ship = makeShip();
+    bullets = [];
+    rocks = [];
+    particles = [];
+    score = 0;
+    lives = 3;
+    level = 1;
+    gameOver = false;
+    shootCooldown = 0;
+    invuln = 90;
+
+    for (let i = 0; i < 5; i++) rocks.push(spawnRock(3));
+  }
+
+  reset();
+
+  function nextLevel() {
+    level++;
+    const add = 2 + Math.floor(level * 0.7);
+    for (let i = 0; i < add; i++) rocks.push(spawnRock(3));
+    invuln = 60;
+  }
+
+  // --- Main loop ---
+  let last = performance.now();
+  function loop(now) {
+    const dt = clamp((now - last) / 16.6667, 0.25, 2.5); // normalized ~60fps
+    last = now;
+
+    update(dt);
+    render();
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  function update(dt) {
+    if (gameOver) return;
+
+    // Controls
+    const left  = keys.has('ArrowLeft') || keys.has('KeyA');
+    const right = keys.has('ArrowRight') || keys.has('KeyD');
+    const thrust = keys.has('ArrowUp') || keys.has('KeyW');
+    const shoot = keys.has('Space');
+
+    if (left)  ship.a -= 0.08 * dt;
+    if (right) ship.a += 0.08 * dt;
+
+    if (thrust) {
+      ship.vx += Math.cos(ship.a) * 0.12 * dt;
+      ship.vy += Math.sin(ship.a) * 0.12 * dt;
+      // A tiny speed cap keeps things “arcade”
+      const sp2 = ship.vx*ship.vx + ship.vy*ship.vy;
+      const max = 2.8;
+      if (sp2 > max*max) {
+        const sp = Math.sqrt(sp2);
+        ship.vx = (ship.vx / sp) * max;
+        ship.vy = (ship.vy / sp) * max;
+      }
+    } else {
+      // Mild drift damping (optional, but helps beginners)
+      ship.vx *= 0.995;
+      ship.vy *= 0.995;
+    }
+
+    ship.x += ship.vx * dt;
+    ship.y += ship.vy * dt;
+    wrap(ship);
+
+    // Shooting
+    shootCooldown -= dt;
+    if (shoot && shootCooldown <= 0) {
+      shootCooldown = 10; // frames-ish
+      const speed = 4.2;
+      bullets.push({
+        x: ship.x + Math.cos(ship.a) * (ship.r + 2),
+        y: ship.y + Math.sin(ship.a) * (ship.r + 2),
+        vx: ship.vx + Math.cos(ship.a) * speed,
+        vy: ship.vy + Math.sin(ship.a) * speed,
+        life: 55
+      });
+    }
+
+    // Bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      wrap(b);
+      b.life -= dt;
+      if (b.life <= 0) bullets.splice(i, 1);
+    }
+
+    // Rocks
+    for (const r of rocks) {
+      r.x += r.vx * dt;
+      r.y += r.vy * dt;
+      r.ang += r.rot * dt;
+      wrap(r);
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= 0.98;
+      p.vy *= 0.98;
+      p.life -= dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // Collisions: bullets vs rocks
+    for (let i = rocks.length - 1; i >= 0; i--) {
+      const r = rocks[i];
+      for (let j = bullets.length - 1; j >= 0; j--) {
+        const b = bullets[j];
+        const rr = r.r + 1;
+        if (dist2(r.x, r.y, b.x, b.y) <= rr*rr) {
+          bullets.splice(j, 1);
+          rocks.splice(i, 1);
+          explode(r.x, r.y, 14);
+          score += (4 - r.size) * 50;
+
+          // Split rock
+          if (r.size > 1) {
+            rocks.push({ ...spawnRock(r.size - 1), x: r.x, y: r.y });
+            rocks.push({ ...spawnRock(r.size - 1), x: r.x, y: r.y });
+          }
+          break;
+        }
+      }
+    }
+
+    // Collisions: ship vs rocks
+    invuln -= dt;
+    if (invuln <= 0) {
+      const sr = ship.r + 2;
+      for (const r of rocks) {
+        const rr = r.r + sr;
+        if (dist2(ship.x, ship.y, r.x, r.y) <= rr*rr) {
+          explode(ship.x, ship.y, 26);
+          lives--;
+          invuln = 120;
+          ship = makeShip();
+          if (lives < 0) {
+            gameOver = true;
+          }
+          break;
+        }
+      }
+    }
+
+    // Level clear
+    if (rocks.length === 0) nextLevel();
+  }
+
+  function render() {
+    // Background
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, INTERNAL_W, INTERNAL_H);
+
+    // Stars (cheap but effective): deterministic-ish based on time
+    ctx.fillStyle = "#030";
+    for (let i = 0; i < 80; i++) {
+      const x = (i * 37) % INTERNAL_W;
+      const y = (i * 59) % INTERNAL_H;
+      ctx.fillRect(x, y, 1, 1);
+    }
+
+    // Rocks
+    ctx.strokeStyle = "#6f6";
+    ctx.lineWidth = 1;
+    for (const r of rocks) {
+      ctx.beginPath();
+      for (let i = 0; i < r.pts.length; i++) {
+        const pt = r.pts[i];
+        const ang = pt.t + r.ang;
+        const px = r.x + Math.cos(ang) * r.r * pt.m;
+        const py = r.y + Math.sin(ang) * r.r * pt.m;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+
+    // Bullets
+    ctx.fillStyle = "#9f9";
+    for (const b of bullets) {
+      ctx.fillRect(b.x - 1, b.y - 1, 2, 2);
+    }
+
+    // Ship
+    if (!gameOver) {
+      const blink = invuln > 0 && Math.floor(invuln / 6) % 2 === 0;
+      if (!blink) {
+        ctx.strokeStyle = "#9f9";
+        ctx.beginPath();
+        const a = ship.a;
+        const x1 = ship.x + Math.cos(a) * 9;
+        const y1 = ship.y + Math.sin(a) * 9;
+        const x2 = ship.x + Math.cos(a + 2.5) * 8;
+        const y2 = ship.y + Math.sin(a + 2.5) * 8;
+        const x3 = ship.x + Math.cos(a - 2.5) * 8;
+        const y3 = ship.y + Math.sin(a - 2.5) * 8;
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(x3, y3);
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+
+    // Particles
+    ctx.fillStyle = "#5f5";
+    for (const p of particles) {
+      ctx.globalAlpha = clamp(p.life / 40, 0, 1);
+      ctx.fillRect(p.x, p.y, 1, 1);
+    }
+    ctx.globalAlpha = 1;
+
+    // Scanline overlay (subtle)
+    ctx.fillStyle = "rgba(0,255,0,0.03)";
+    for (let y = 0; y < INTERNAL_H; y += 2) ctx.fillRect(0, y, INTERNAL_W, 1);
+
+    // HUD
+    const hud = document.getElementById('hud');
+    hud.textContent =
+      `SCORE ${score}\n` +
+      `LIVES ${Math.max(0, lives)}\n` +
+      `LEVEL ${level}` +
+      (gameOver ? `\n\nGAME OVER\nPress R` : '');
+  }
+})();
+</script>
+</body>
+</html>
+

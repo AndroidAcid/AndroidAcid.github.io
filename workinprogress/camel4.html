@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Neon Mutant Camels – Defender Mode (Full + Mountains Nudge)</title>
+<style>
+  body { margin: 0; background: black; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<script>
+/* =======================
+   CANVAS / VIEW
+======================= */
+const c = document.getElementById("c");
+const ctx = c.getContext("2d");
+
+let VIEW = {};
+let neonPhase = 0;
+let shake = 0;
+
+function resize() {
+  c.width = innerWidth;
+  c.height = innerHeight;
+  const viewHeight = c.height * 0.60;
+  VIEW = {
+    x: 0,
+    y: (c.height - viewHeight) / 2,
+    w: c.width,
+    h: viewHeight
+  };
+}
+resize();
+addEventListener("resize", resize);
+
+const keys = {};
+addEventListener("keydown", e => keys[e.code] = true);
+addEventListener("keyup", e => keys[e.code] = false);
+
+/* =======================
+   WORLD
+======================= */
+const WORLD_WIDTH = 6000;
+const GROUND_MARGIN = 20;
+const GROUND_Y = () => VIEW.y + VIEW.h - GROUND_MARGIN;
+const wrapX = x => (x % WORLD_WIDTH + WORLD_WIDTH) % WORLD_WIDTH;
+
+/* =======================
+   NEON HELPERS
+======================= */
+function neonColor(base, offset = 0) {
+  const hue = (neonPhase * 40 + offset) % 360;
+  return `hsl(${hue}, 100%, ${base}%)`;
+}
+function glow(col, blur) {
+  ctx.shadowColor = col;
+  ctx.shadowBlur = blur;
+}
+
+/* =======================
+   PLAYER / CAMERA
+======================= */
+const player = {
+  x: WORLD_WIDTH / 2,
+  y: 0,
+  vx: 0,
+  vy: 0,
+  cooldown: 0,
+  alive: true,
+  lives: 3,
+  score: 0
+};
+
+function camX() {
+  return player.x - VIEW.w / 2;
+}
+
+/* =======================
+   ENTITIES
+======================= */
+const shots = [];
+const enemyShots = [];
+const walkers = [];
+const particles = [];
+
+function spawnWave(count = 8) {
+  walkers.length = 0;
+  for (let i = 0; i < count; i++) {
+    walkers.push({
+      x: Math.random() * WORLD_WIDTH,
+      y: GROUND_Y(),
+      dir: Math.random() < 0.5 ? -1 : 1,
+      size: 40,
+      hp: 12,
+      fireTimer: Math.random() * 120
+    });
+  }
+}
+
+function resetPlayer() {
+  player.x = WORLD_WIDTH / 2;
+  player.y = VIEW.y + VIEW.h * 0.25;
+  player.vx = 0;
+  player.vy = 0;
+  player.cooldown = 0;
+  player.alive = true;
+}
+
+resetPlayer();
+spawnWave();
+
+/* =======================
+   EXPLOSIONS
+======================= */
+function explode(x, y, col, n = 34, force = 6) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = Math.random() * force;
+    particles.push({
+      x, y,
+      vx: Math.cos(a) * s,
+      vy: Math.sin(a) * s,
+      life: 30 + Math.random() * 25,
+      col
+    });
+  }
+}
+
+/* =======================
+   SHOOTING
+======================= */
+function shoot() {
+  if (player.cooldown || !player.alive) return;
+  shots.push({
+    x: player.x,
+    y: player.y,
+    vy: 8,
+    life: 120
+  });
+  player.cooldown = 5;
+}
+
+/* =======================
+   UPDATE
+======================= */
+function update() {
+  neonPhase += 0.002;
+
+  if (keys.ArrowLeft) player.vx -= 0.4;
+  if (keys.ArrowRight) player.vx += 0.4;
+  if (keys.ArrowUp) player.vy -= 0.3;
+  if (keys.ArrowDown) player.vy += 0.3;
+  if (keys.Space) shoot();
+
+  player.x = wrapX(player.x + player.vx);
+  player.y += player.vy;
+
+  player.vx *= 0.95;
+  player.vy *= 0.95;
+
+  const topLimit = VIEW.y + 40;
+  const bottomLimit = GROUND_Y() - 80;
+  player.y = Math.max(topLimit, Math.min(bottomLimit, player.y));
+
+  if (player.cooldown) player.cooldown--;
+
+  // Player shots
+  shots.forEach(s => { s.y += s.vy; s.life--; });
+
+  // Walkers
+  walkers.forEach(w => {
+    w.x = wrapX(w.x + w.dir * 0.5);
+    w.y = GROUND_Y();
+    w.fireTimer++;
+    if (w.fireTimer > 120) {
+      w.fireTimer = 0;
+      enemyShots.push({
+        x: w.x,
+        y: w.y - w.size,
+        vy: -4,
+        life: 200
+      });
+    }
+  });
+
+  // Enemy shots
+  enemyShots.forEach(s => { s.y += s.vy; s.life--; });
+
+  // Collisions: player shots -> walkers
+  shots.forEach(s => {
+    walkers.forEach(w => {
+      if (
+        Math.abs(s.x - w.x) < w.size &&
+        s.y > w.y - w.size
+      ) {
+        w.hp--;
+        s.life = 0;
+        if (w.hp <= 0) {
+          player.score += 100;
+          explode(w.x, w.y - w.size * 0.7, "rgba(183,255,60,0.95)", 46, 7);
+          shake = 12;
+        }
+      }
+    });
+  });
+
+  // Collisions: enemy shots -> player
+  enemyShots.forEach(s => {
+    if (!player.alive) return;
+    if (Math.abs(s.x - player.x) < 14 && Math.abs(s.y - player.y) < 14) {
+      s.life = 0;
+      player.lives--;
+      player.alive = false;
+
+      explode(player.x, player.y, "rgba(40,247,255,0.95)", 40, 7);
+      explode(player.x, player.y, "rgba(255,45,247,0.90)", 34, 6);
+      shake = 18;
+
+      if (player.lives > 0) {
+        setTimeout(resetPlayer, 800);
+      } else {
+        // if you want: game over state later
+        setTimeout(() => { player.lives = 3; player.score = 0; resetPlayer(); spawnWave(10); }, 1400);
+      }
+    }
+  });
+
+  // Cleanup (CORRECT, SAFE)
+  for (let i = shots.length - 1; i >= 0; i--)
+    if (shots[i].life <= 0) shots.splice(i, 1);
+
+  for (let i = enemyShots.length - 1; i >= 0; i--)
+    if (enemyShots[i].life <= 0) enemyShots.splice(i, 1);
+
+  for (let i = walkers.length - 1; i >= 0; i--)
+    if (walkers[i].hp <= 0) walkers.splice(i, 1);
+
+  for (let i = particles.length - 1; i >= 0; i--)
+    if (particles[i].life <= 0) particles.splice(i, 1);
+
+  if (walkers.length === 0) spawnWave(10);
+
+  // Particles
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.95;
+    p.vy *= 0.95;
+    p.life--;
+  });
+
+  if (shake > 0) shake *= 0.85;
+}
+
+/* =======================
+   BACKGROUND
+======================= */
+function drawNeonBG() {
+  const g = ctx.createRadialGradient(
+    c.width * 0.2, VIEW.y * 0.5, 100,
+    c.width * 0.2, VIEW.y * 0.5, c.width
+  );
+  g.addColorStop(0, "#0c1030");
+  g.addColorStop(.4, "#05060a");
+  g.addColorStop(1, "#03040a");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, c.width, VIEW.y);
+  ctx.fillRect(0, VIEW.y + VIEW.h, c.width, c.height);
+}
+
+// STATIC PYRAMIDS (moved up by 5px total)
+function drawPyramidMountains() {
+  const horizon = VIEW.y + VIEW.h * 0.30;
+  const baseY = horizon + 3; // was +8, then +3 (5px higher)
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(0,255,120,0.28)";
+  ctx.shadowColor = "rgba(0,255,120,0.20)";
+  ctx.shadowBlur = 8;
+  ctx.lineWidth = 1;
+
+  const spacing = 90;
+  const peaks = Math.ceil(c.width / spacing) + 2;
+
+  ctx.beginPath();
+  for (let i = -1; i < peaks; i++) {
+    const x = i * spacing;
+    const h = 40 + Math.sin(i * 1.7) * 18;
+    ctx.moveTo(x, baseY);
+    ctx.lineTo(x + spacing * 0.5, baseY - h);
+    ctx.lineTo(x + spacing, baseY);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// PERSPECTIVE GRID (scrolls into distance)
+function drawWireframeGrid() {
+  const parallax = 0.35;
+  const cam = camX() * parallax;
+
+  const horizon = VIEW.y + VIEW.h * 0.30;
+  const gridY = VIEW.y + VIEW.h * 0.88;
+
+  ctx.save();
+  ctx.translate(-cam, 0);
+
+  // depth gradient
+  const g = ctx.createLinearGradient(cam, 0, cam, c.height);
+  g.addColorStop(0, "rgba(40,247,255,0.10)");
+  g.addColorStop(0.45, "rgba(255,45,247,0.05)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(cam, VIEW.y, VIEW.w, c.height);
+
+  // vertical perspective lines
+  ctx.strokeStyle = "rgba(40,247,255,0.16)";
+  ctx.lineWidth = 1;
+
+  for (let x = Math.floor((cam - 400) / 80) * 80; x < cam + VIEW.w + 400; x += 80) {
+    ctx.beginPath();
+    ctx.moveTo(x, gridY);
+    ctx.lineTo((x + cam + VIEW.w * 0.5) * 0.5, horizon);
+    ctx.stroke();
+  }
+
+  // horizontal depth lines
+  for (let i = 0; i < 12; i++) {
+    const t = i / 11;
+    const y = gridY - (gridY - horizon) * t;
+    ctx.strokeStyle = `rgba(255,45,247,${0.18 * (1 - t)})`;
+    ctx.beginPath();
+    ctx.moveTo(cam - 400, y);
+    ctx.lineTo(cam + VIEW.w + 400, y);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/* =======================
+   HUD / RADAR
+======================= */
+function drawHUD() {
+  glow("#28f7ff", 18);
+  ctx.fillStyle = "#28f7ff";
+  ctx.font = "16px ui-monospace";
+  ctx.fillText(`SCORE ${player.score.toString().padStart(6, "0")}`, 20, VIEW.y - 12);
+  ctx.fillText(`LIVES ${player.lives}`, VIEW.w - 120, VIEW.y - 12);
+}
+
+function drawRadar() {
+  const h = 14;
+  const y = VIEW.y + VIEW.h + 18;
+  const x = 40;
+  const w = VIEW.w - 80;
+
+  glow("#28f7ff", 14);
+  ctx.strokeStyle = "rgba(40,247,255,0.6)";
+  ctx.strokeRect(x, y, w, h);
+
+  const s = w / WORLD_WIDTH;
+
+  ctx.fillStyle = "#ff2df7";
+  walkers.forEach(e => ctx.fillRect(x + e.x * s, y + 3, 3, h - 6));
+
+  ctx.fillStyle = "#b7ff3c";
+  ctx.fillRect(x + player.x * s, y - 3, 4, h + 6);
+}
+
+/* =======================
+   DRAW GAMEPLAY
+======================= */
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, c.width, c.height);
+
+  drawNeonBG();
+  drawHUD();
+
+  ctx.save();
+  ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+
+  // Clip to playfield
+  ctx.beginPath();
+  ctx.rect(VIEW.x, VIEW.y, VIEW.w, VIEW.h);
+  ctx.clip();
+
+  ctx.fillStyle = "black";
+  ctx.fillRect(VIEW.x, VIEW.y, VIEW.w, VIEW.h);
+
+  // BACKGROUND STACK
+  drawPyramidMountains();
+  drawWireframeGrid();
+
+  const offsetX = (camX() | 0);
+
+  // Ground line
+  glow("#00ff66", 28);
+  ctx.strokeStyle = "#00ff66";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = -1; i <= 1; i++) {
+    const baseX = i * WORLD_WIDTH - offsetX;
+    ctx.moveTo(baseX, GROUND_Y());
+    ctx.lineTo(baseX + WORLD_WIDTH, GROUND_Y());
+  }
+  ctx.stroke();
+
+  // Player
+  if (player.alive) {
+    const shipCol = neonColor(70, 200);
+    glow(shipCol, 30);
+    ctx.strokeStyle = shipCol;
+    ctx.beginPath();
+    ctx.moveTo(player.x - offsetX, player.y - 12);
+    ctx.lineTo(player.x - offsetX - 12, player.y + 12);
+    ctx.lineTo(player.x - offsetX + 12, player.y + 12);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // Player shots
+  const shotCol = neonColor(65, 60);
+  glow(shotCol, 20);
+  ctx.strokeStyle = shotCol;
+  shots.forEach(s => {
+    for (let i = -1; i <= 1; i++) {
+      const x = s.x - offsetX + i * WORLD_WIDTH;
+      ctx.beginPath();
+      ctx.moveTo(x, s.y);
+      ctx.lineTo(x, s.y + 10);
+      ctx.stroke();
+    }
+  });
+
+  // Enemy shots
+  const eShotCol = neonColor(60, 300);
+  glow(eShotCol, 25);
+  ctx.fillStyle = eShotCol;
+  enemyShots.forEach(s => {
+    for (let i = -1; i <= 1; i++) {
+      const x = s.x - offsetX + i * WORLD_WIDTH;
+      ctx.beginPath();
+      ctx.arc(x, s.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+
+  // Walkers (camels)
+  const walkerCol = neonColor(55, 0);
+  walkers.forEach(w => {
+    glow(walkerCol, 35);
+    ctx.strokeStyle = walkerCol;
+    ctx.lineWidth = 3;
+
+    for (let i = -1; i <= 1; i++) {
+      const x = w.x - offsetX + i * WORLD_WIDTH;
+
+      // body
+      ctx.beginPath();
+      ctx.rect(x - w.size, w.y - w.size, w.size * 2, w.size * 0.75);
+      ctx.stroke();
+
+      // neck + head
+      ctx.beginPath();
+      ctx.moveTo(x + w.size * 0.55, w.y - w.size);
+      ctx.lineTo(x + w.size * 0.55, w.y - w.size * 1.35);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.rect(x + w.size * 0.35, w.y - w.size * 1.55, w.size * 0.45, w.size * 0.28);
+      ctx.stroke();
+
+      // legs
+      ctx.beginPath();
+      ctx.moveTo(x - w.size * 0.55, w.y);
+      ctx.lineTo(x - w.size * 0.40, w.y + 26);
+      ctx.moveTo(x + w.size * 0.20, w.y);
+      ctx.lineTo(x + w.size * 0.40, w.y + 26);
+      ctx.stroke();
+    }
+  });
+
+  // Particles / explosions
+  particles.forEach(p => {
+    ctx.save();
+    ctx.fillStyle = p.col;
+    ctx.shadowColor = p.col;
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.arc(p.x - offsetX, p.y, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  ctx.restore();
+  ctx.shadowBlur = 0;
+
+  drawRadar();
+}
+
+/* =======================
+   LOOP
+======================= */
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
+
