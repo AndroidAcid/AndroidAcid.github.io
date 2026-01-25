@@ -182,8 +182,11 @@
 
   // Enemy pacing
   const MAX_ACTIVE_ENEMIES_CAP=10;
+  const ENEMY_SHOOT_RANGE = 420;
+  const ENEMY_SHOOT_COOLDOWN = 1.1;
+  const ENEMY_BULLET_SPEED = 420;
 
-  let world, player, bullets, enemies, hazards, particles;
+  let world, player, bullets, enemyBullets, enemies, hazards, particles;
   let cameraX=0;
   let gameOver=false;
   let tPrev=performance.now();
@@ -315,6 +318,7 @@
           vx:(Math.random()>0.5?1:-1)*rand(55,85+levelNum*6),
           hp: 2 + Math.floor(levelNum/2),
           kind:"drifter",
+        shootCooldown: rand(0.3, 1.0),
           baseX: 0
         });
       }
@@ -338,6 +342,7 @@
         vx:(Math.random()>0.5?1:-1)*rand(55,85+level*6),
         hp:2+Math.floor(level/2),
         kind:"drifter",
+        shootCooldown: rand(0.3, 1.0),
         baseX:ex
       };
       let bad=false;
@@ -368,7 +373,7 @@
       score: full ? 0 : (player?.score ?? 0),
     };
 
-    bullets=[]; particles=[];
+    bullets=[]; enemyBullets=[]; particles=[];
     hazards = world.hazards.map(h=>({...h}));
     enemies = world.enemies.map(e=>({...e, baseX:e.x}));
     for(const e of enemies){ e.baseX = e.x; }
@@ -504,6 +509,48 @@
       }
 
       if(b.life<=0 || b.x < cameraX-200 || b.x > cameraX+W+400) bullets.splice(i,1);
+    }
+
+
+    // --- Enemy shooting (level 3+) ---
+    if(level >= 3){
+      for(const e of enemies){
+        e.shootCooldown = Math.max(0, e.shootCooldown - dt);
+        const dx = (player.x + player.w/2) - (e.x + e.w/2);
+        if(Math.abs(dx) < ENEMY_SHOOT_RANGE && e.shootCooldown <= 0){
+          e.shootCooldown = ENEMY_SHOOT_COOLDOWN;
+          enemyBullets.push({
+            x: e.x + e.w/2,
+            y: e.y + e.h*0.5,
+            w: 8, h: 4,
+            vx: Math.sign(dx) * ENEMY_BULLET_SPEED,
+            vy: 0,
+            life: 2
+          });
+        }
+      }
+    }
+
+
+    // enemy bullets
+    for(let i=enemyBullets.length-1;i>=0;i--){
+      const b = enemyBullets[i];
+      b.x += b.vx*dt;
+      b.life -= dt;
+
+      for(const p of world.platforms){
+        if(rectsOverlap(b,p)){ enemyBullets.splice(i,1); continue; }
+      }
+
+      if(rectsOverlap(b, player)){
+        enemyBullets.splice(i,1);
+        killPlayer();
+        continue;
+      }
+
+      if(b.life <= 0 || b.x < cameraX-200 || b.x > cameraX+W+400){
+        enemyBullets.splice(i,1);
+      }
     }
 
     // enemies
@@ -704,6 +751,13 @@
         "rgba(40,247,255,0.45)");
     }
 
+
+    for(const b of enemyBullets){
+      glowRect(b.x, b.y, b.w, b.h,
+        "rgba(255,45,247,0.85)",
+        "rgba(255,45,247,0.35)",
+        "rgba(255,45,247,0.45)");
+    }
     const flicker = player.invuln > 0 && (Math.floor(performance.now()/70) % 2 === 0);
     if(!flicker){
       glowRect(player.x, player.y, player.w, player.h,
