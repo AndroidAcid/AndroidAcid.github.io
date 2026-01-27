@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neon Poly Rail — Readable Edition</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#05010a;font-family:system-ui}
+canvas{display:block}
+#hud{
+  position:fixed;left:10px;top:10px;z-index:2;
+  padding:12px 14px;color:#fff;
+  background:linear-gradient(135deg,rgba(255,0,255,.12),rgba(0,255,255,.08));
+  border-radius:14px;border:1px solid rgba(255,255,255,.14);
+  text-shadow:0 0 12px rgba(255,0,255,.6);
+}
+.pill{
+  display:inline-block;padding:6px 10px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(0,0,0,.22);margin-top:6px;font-size:12px
+}
+#msg{
+  position:fixed;inset:0;display:grid;place-items:center;z-index:3;
+  background:radial-gradient(circle at 50% 40%,rgba(255,0,255,.18),rgba(0,0,0,.9));
+  color:#fff;text-align:center;text-shadow:0 0 16px rgba(255,0,255,.7)
+}
+#msg.hidden{display:none}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <b>NEON POLY RAIL</b><br>
+  Score: <span id="score">0</span> · Lives: <span id="lives">3</span>
+  <div class="pill">A/D or ←/→ : Lane</div>
+  <div class="pill">Space : Shoot</div>
+</div>
+
+<div id="msg">
+  <div>
+    <h1 style="letter-spacing:.1em">NEON POLY RAIL</h1>
+    <p>Clean lanes. Clear paths. Sacred geometry.</p>
+    <div class="pill">Press ENTER</div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script>
+/* ---------- helpers ---------- */
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rand=(a,b)=>a+Math.random()*(b-a);
+const now=()=>performance.now();
+
+/* =========================================================
+   MUSIC (isolated; 8 beats base, 8 beats +4, repeat)
+   - Does NOT touch game variables
+   - Starts on ENTER (user gesture)
+========================================================= */
+let _audio=null;
+function startMusic(){
+  if(_audio) return; // already running
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AudioContext();
+  const master = ctx.createGain();
+  master.gain.value = 0.35;
+  master.connect(ctx.destination);
+
+  const BPM = 120;
+  const spb = 60 / BPM;
+
+  let nextTime = ctx.currentTime;
+  let beat = 0;
+  let transpose = 0; // 0 or +4 semitones
+  const scale = [0,3,7,10];
+
+  function voice(type, freq, gain, dur, t){
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(master);
+    o.start(t);
+    o.stop(t + dur);
+  }
+
+  function tick(){
+    // schedule ahead slightly
+    while(nextTime < ctx.currentTime + 0.12){
+      // kick (constant)
+      voice("sine", 120, 1.0, 0.20, nextTime);
+      voice("sine",  40, 0.8, 0.25, nextTime);
+
+      // bass (transposed)
+      const bassFreq = 55 * Math.pow(2, transpose / 12);
+      voice("sawtooth", bassFreq, 0.40, 0.40, nextTime);
+
+      // arp on offbeat (also transposed)
+      const n = scale[beat % scale.length] + transpose;
+      const arpFreq = 220 * Math.pow(2, n / 12);
+      voice("triangle", arpFreq, 0.25, 0.18, nextTime + spb/2);
+
+      beat++;
+      if(beat % 8 === 0) transpose = (transpose === 0) ? 4 : 0;
+
+      nextTime += spb;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  _audio = { ctx, master };
+  tick();
+}
+
+/* ---------- scene ---------- */
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x05010a,0.018);
+
+const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,0.1,500);
+camera.position.set(0,1.0,5.2);
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+document.body.appendChild(renderer.domElement);
+
+/* ---------- lights ---------- */
+scene.add(new THREE.AmbientLight(0xffffff,0.25));
+const lp=new THREE.PointLight(0xff00ff,1.2,90); lp.position.set(6,4,7); scene.add(lp);
+const lc=new THREE.PointLight(0x00ffff,1.0,90); lc.position.set(-6,-1,7); scene.add(lc);
+
+/* ---------- stars ---------- */
+{
+  const g=new THREE.BufferGeometry();
+  const n=1200,p=new Float32Array(n*3);
+  for(let i=0;i<n;i++){
+    p[i*3]=rand(-120,120);
+    p[i*3+1]=rand(-70,70);
+    p[i*3+2]=rand(-260,80);
+  }
+  g.setAttribute('position',new THREE.BufferAttribute(p,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({
+    color:0xbba6ff,size:0.09,opacity:.85,transparent:true
+  })));
+}
+
+/* ---------- lanes ---------- */
+const laneCount=5;
+const laneSpacing=1.15;
+const lanes=[...Array(laneCount)].map((_,i)=>(i-(laneCount-1)/2)*laneSpacing);
+let laneIndex=Math.floor(laneCount/2);
+let laneX=lanes[laneIndex];
+
+/* ---------- background tunnel ---------- */
+const tunnel=new THREE.Group(); scene.add(tunnel);
+const ringGeo=new THREE.TorusGeometry(6.8,0.05,8,48);
+const rings=[],ringCount=60,ringSpacing=4;
+for(let i=0;i<ringCount;i++){
+  const c=i%2?0xff00ff:0x00ffff;
+  const r=new THREE.Mesh(ringGeo,new THREE.MeshStandardMaterial({
+    color:c,emissive:c,emissiveIntensity:.35,transparent:true,opacity:.25
+  }));
+  r.rotation.x=Math.PI/2;
+  r.position.z=-i*ringSpacing;
+  tunnel.add(r);rings.push(r);
+}
+
+/* ---------- rails ---------- */
+const railGroup=new THREE.Group(); scene.add(railGroup);
+function rail(x,c){
+  const pts=[];
+  for(let z=6;z>-260;z-=2) pts.push(new THREE.Vector3(x,-.2,z));
+  railGroup.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:c,opacity:.6,transparent:true})
+  ));
+}
+rail(lanes[2],0x00ffff); rail(lanes[0],0xff00ff); rail(lanes[4],0xff00ff);
+
+/* ---------- grid ---------- */
+const grid=new THREE.GridHelper(160,160,0x00ffff,0xff00ff);
+grid.position.y=-5.3; grid.position.z=-40;
+grid.material.opacity=.25; grid.material.transparent=true;
+scene.add(grid);
+
+/* ---------- player ---------- */
+const player=new THREE.Mesh(
+  new THREE.IcosahedronGeometry(.28,0),
+  new THREE.MeshStandardMaterial({color:0x00ffff,emissive:0x00ffff,emissiveIntensity:1})
+);
+player.position.z=2.2; scene.add(player);
+
+/* ---------- enemies ---------- */
+const enemies=[];
+const enemyGeo=[
+  new THREE.TetrahedronGeometry(.34),
+  new THREE.OctahedronGeometry(.32),
+  new THREE.DodecahedronGeometry(.30)
+];
+
+function spawnEnemy(z){
+  const geo=enemyGeo[Math.floor(Math.random()*enemyGeo.length)];
+  const c=Math.random()<.5?0xfff000:0xff2a6d;
+  const e=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({
+    color:c,emissive:c,emissiveIntensity:1
+  }));
+  const li=Math.floor(Math.random()*laneCount);
+  e.position.set(lanes[li],0,z);
+  scene.add(e); enemies.push(e);
+}
+
+/* ---------- obstacles ---------- */
+const obstacles=[];
+function spawnObstacle(z){
+  const o=new THREE.Mesh(
+    new THREE.BoxGeometry(.75,.75,.75),
+    new THREE.MeshStandardMaterial({
+      color:0xff00ff,emissive:0xff00ff,emissiveIntensity:.8
+    })
+  );
+  const li=Math.floor(Math.random()*laneCount);
+  o.position.set(lanes[li],0,z);
+  scene.add(o); obstacles.push(o);
+}
+
+/* ---------- bullets ---------- */
+const bullets=[];
+function shoot(){
+  const b=new THREE.Mesh(
+    new THREE.SphereGeometry(.06,12,12),
+    new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:1.2})
+  );
+  b.position.set(player.position.x,0,player.position.z-.6);
+  scene.add(b); bullets.push(b);
+}
+
+/* ---------- input ---------- */
+addEventListener('keydown',e=>{
+  if(e.code==="Enter"&&!running){ start(); startMusic(); }
+  if(e.code==="ArrowLeft"||e.code==="KeyA") laneIndex=clamp(laneIndex-1,0,laneCount-1);
+  if(e.code==="ArrowRight"||e.code==="KeyD") laneIndex=clamp(laneIndex+1,0,laneCount-1);
+  if(e.code==="Space") shoot();
+});
+
+/* ---------- game state ---------- */
+let running=false,score=0,lives=3;
+const hudScore=document.getElementById('score');
+const hudLives=document.getElementById('lives');
+const msg=document.getElementById('msg');
+let lastT=now();
+
+/* ---------- speed ramp + hard cap (safe) ---------- */
+let speedMul = 1;
+const MAX_SPEED_MUL = 2.6; // playable cap; adjust 2.3–3.0 if desired
+
+function start(){
+  running=true; msg.classList.add('hidden');
+  for(let i=0;i<8;i++) spawnEnemy(-30-i*10);
+  for(let i=0;i<5;i++) spawnObstacle(-60-i*18);
+}
+
+/* ---------- loop ---------- */
+function update(dt){
+  speedMul = Math.min(speedMul + dt * 0.04, MAX_SPEED_MUL);
+  const speed = 14 * speedMul * dt;
+
+  laneX += (lanes[laneIndex]-laneX) * .18;
+  player.position.x = laneX;
+
+  for(const r of rings){
+    r.position.z += speed;
+    if(r.position.z > 6) r.position.z -= ringCount * ringSpacing;
+  }
+
+  grid.position.z += speed * .6;
+  if(grid.position.z > 40) grid.position.z -= 80;
+
+  for(let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];
+    e.position.z += speed;
+    if(Math.abs(e.position.z-player.position.z)<.4 &&
+       Math.abs(e.position.x-player.position.x)<.4){
+      lives--; hudLives.textContent=lives;
+      scene.remove(e); enemies.splice(i,1);
+      continue;
+    }
+    if(e.position.z>6){ scene.remove(e); enemies.splice(i,1); }
+  }
+
+  for(let i=obstacles.length-1;i>=0;i--){
+    const o=obstacles[i];
+    o.position.z += speed;
+    if(Math.abs(o.position.z-player.position.z)<.4 &&
+       Math.abs(o.position.x-player.position.x)<.4){
+      lives--; hudLives.textContent=lives;
+      scene.remove(o); obstacles.splice(i,1);
+      continue;
+    }
+    if(o.position.z>6){ scene.remove(o); obstacles.splice(i,1); }
+  }
+
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    b.position.z -= dt * 40;
+
+    // keep list clean
+    if(b.position.z < -260){
+      scene.remove(b); bullets.splice(i,1);
+      continue;
+    }
+
+    for(let j=enemies.length-1;j>=0;j--){
+      if(b.position.distanceTo(enemies[j].position)<.35){
+        score += 10; hudScore.textContent = score;
+        scene.remove(enemies[j]); enemies.splice(j,1);
+        scene.remove(b); bullets.splice(i,1);
+        break;
+      }
+    }
+  }
+
+  if(Math.random()<.015) spawnEnemy(-120);
+  if(Math.random()<.008) spawnObstacle(-160);
+
+  camera.lookAt(player.position.x,0,-12);
+}
+
+/* ---------- animate ---------- */
+function animate(){
+  requestAnimationFrame(animate);
+  const t=now(),dt=Math.min(.033,(t-lastT)/1000); lastT=t;
+  if(running) update(dt);
+  renderer.render(scene,camera);
+}
+animate();
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
+
