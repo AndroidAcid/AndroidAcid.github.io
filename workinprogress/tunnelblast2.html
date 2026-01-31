@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Neon Tunnel Shooter</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #03040a; }
+    #hud {
+      position: fixed; left: 12px; top: 10px; color: #bff;
+      font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-shadow: 0 0 8px rgba(120,255,255,0.35);
+      user-select: none;
+      pointer-events: none;
+      white-space: pre;
+    }
+    #hint {
+      position: fixed; left: 12px; bottom: 10px; color: #f7f; opacity: 0.9;
+      font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-shadow: 0 0 8px rgba(255,120,255,0.35);
+      user-select: none;
+      pointer-events: none;
+    }
+    #overlay {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    #overlay .panel{
+      padding: 18px 22px;
+      border-radius: 14px;
+      background: rgba(2,3,10,0.55);
+      box-shadow: 0 0 30px rgba(0,246,255,0.08), 0 0 40px rgba(255,61,252,0.06);
+      border: 1px solid rgba(120,255,255,0.12);
+      color: #dff;
+      text-shadow: 0 0 10px rgba(120,255,255,0.22);
+      font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre;
+      text-align: center;
+      max-width: min(560px, calc(100vw - 40px));
+    }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <div id="hud"></div>
+  <div id="hint">WASD/Arrows move • Mouse aim • Click/Space shoot • Enter start/restart • Esc pause</div>
+  <div id="overlay" style="display:none;"><div class="panel" id="overlayText"></div></div>
+
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+
+    // -----------------------------
+    // Utility
+    // -----------------------------
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const lerp = (a, b, t) => a + (b - a) * t;
+
+    function smoothstep(edge0, edge1, x) {
+      const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+      return t * t * (3 - 2 * t);
+    }
+
+    function fmtTime(seconds) {
+      const s = Math.max(0, Math.floor(seconds));
+      const mm = String(Math.floor(s / 60)).padStart(2, "0");
+      const ss = String(s % 60).padStart(2, "0");
+      return `${mm}:${ss}`;
+    }
+
+    // -----------------------------
+    // Renderer / Scene / Camera
+    // -----------------------------
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setClearColor(0x02030a, 1);
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x02030a, 20, 120);
+
+    const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 400);
+    camera.position.set(0, 2.5, 10);
+
+    const clock = new THREE.Clock();
+
+    // Lighting: mostly emissive visuals; small fill so shapes read.
+    scene.add(new THREE.AmbientLight(0x334455, 0.6));
+    const key = new THREE.DirectionalLight(0x99ccff, 0.45);
+    key.position.set(5, 8, 6);
+    scene.add(key);
+
+    // -----------------------------
+    // Game State (NEW)
+    // -----------------------------
+    const GAME_STATE = {
+      ATTRACT: "attract",
+      PLAYING: "playing",
+      PAUSED: "paused",
+      GAME_OVER: "gameover",
+    };
+    let gameState = GAME_STATE.ATTRACT;
+    let gameOverTimer = 0;
+
+    const overlay = document.getElementById("overlay");
+    const overlayText = document.getElementById("overlayText");
+    const hud = document.getElementById("hud");
+
+    function setOverlay(show, text="") {
+      overlay.style.display = show ? "flex" : "none";
+      if (show) overlayText.textContent = text;
+    }
+
+    // -----------------------------
+    // Glow tuning (NEW-ish — includes your requested items)
+    // -----------------------------
+    const fogColor = new THREE.Color(scene.fog.color);
+    const _tmpColorA = new THREE.Color();
+    const _tmpColorB = new THREE.Color();
+    const _tmpVec = new THREE.Vector3();
+
+    // Distance-based attenuation
+    const GLOW_FADE_NEAR = 10;
+    const GLOW_FADE_FAR  = 130;
+
+    // Fog-color-aware tinting strength
+    const GLOW_FOG_TINT_STRENGTH = 0.70;
+
+    // Per-ring glow scale based on Z
+    const RING_Z_NEAR = 10;
+    const RING_Z_FAR  = -240;
+
+    const glowSprites = []; // sprites to post-update
+    function registerGlowSprite(spr, baseColorHex, baseScale, type = "generic") {
+      spr.userData._glow = {
+        baseColor: new THREE.Color(baseColorHex),
+        baseScale,
+        type
+      };
+      glowSprites.push(spr);
+      return spr;
+    }
+
+    function updateGlowSprite(spr) {
+      spr.getWorldPosition(_tmpVec);
+      const d = _tmpVec.distanceTo(camera.position);
+
+      const distFade = 1.0 - smoothstep(GLOW_FADE_NEAR, GLOW_FADE_FAR, d);
+
+      let fogT = 0;
+      if (scene.fog) {
+        fogT = clamp((d - scene.fog.near) / (scene.fog.far - scene.fog.near), 0, 1);
+      }
+
+      const g = spr.userData._glow;
+      if (!g) return;
+
+      // Fog-aware tint: blend glow color towards fog color
+      _tmpColorA.copy(g.baseColor);
+      _tmpColorB.copy(fogColor);
+      const tintT = fogT * GLOW_FOG_TINT_STRENGTH;
+      const tinted = _tmpColorA.lerp(_tmpColorB, tintT);
+      spr.material.color.copy(tinted);
+
+      // Fade with distance + fog
+      const fogFade = 1.0 - fogT * 0.80;
+      spr.material.opacity = clamp(0.10 + distFade * fogFade * 0.95, 0.04, 0.95);
+
+      // Per-ring Z scaling (rings shrink as they recede)
+      let scaleMul = 1.0;
+      if (g.type === "ring") {
+        const wz = _tmpVec.z;
+        const zT = smoothstep(RING_Z_FAR, RING_Z_NEAR, wz); // far=0, near=1
+        scaleMul = lerp(0.45, 1.05, zT);
+      } else {
+        // generic: mild shrink with distance to reduce stacking
+        scaleMul = lerp(0.70, 1.0, distFade);
+      }
+
+      const s = g.baseScale * scaleMul;
+      spr.scale.set(s, s, 1);
+    }
+
+    // -----------------------------
+    // Neon materials
+    // -----------------------------
+    function neonMat(hex, emiss = 1.8) {
+      return new THREE.MeshStandardMaterial({
+        color: new THREE.Color(hex),
+        emissive: new THREE.Color(hex),
+        emissiveIntensity: emiss,
+        metalness: 0.25,
+        roughness: 0.35,
+      });
+    }
+
+    // Additive "glow" sprite (cheap bloom feel)
+    function makeGlowSprite(colorHex, size = 2.2) {
+      const c = document.createElement("canvas");
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext("2d");
+      const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+
+      // Softer core to avoid welding-arc white at tunnel end
+      grad.addColorStop(0.00, "rgba(255,255,255,0.55)");
+      grad.addColorStop(0.15, "rgba(255,255,255,0.22)");
+
+      const col = new THREE.Color(colorHex);
+      const edge = `rgba(${Math.floor(col.r*255)},${Math.floor(col.g*255)},${Math.floor(col.b*255)},0.0)`;
+      const mid  = `rgba(${Math.floor(col.r*255)},${Math.floor(col.g*255)},${Math.floor(col.b*255)},0.22)`;
+      grad.addColorStop(0.40, mid);
+      grad.addColorStop(1.00, edge);
+
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        color: new THREE.Color(colorHex),
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        opacity: 0.95
+      });
+
+      const spr = new THREE.Sprite(mat);
+      spr.scale.set(size, size, 1);
+
+      registerGlowSprite(spr, colorHex, size, "generic");
+      return spr;
+    }
+
+    // -----------------------------
+    // Tunnel
+    // -----------------------------
+    const tunnelGroup = new THREE.Group();
+    scene.add(tunnelGroup);
+
+    const ringGeo = new THREE.TorusGeometry(10, 0.06, 10, 64);
+    const ringMats = [
+      neonMat("#00f6ff", 1.3),
+      neonMat("#ff3dfc", 1.25),
+      neonMat("#7CFF00", 1.15),
+    ];
+
+    const rings = [];
+    const RING_COUNT = 40;
+    for (let i = 0; i < RING_COUNT; i++) {
+      const m = ringMats[i % ringMats.length].clone();
+      m.emissiveIntensity *= 0.75;
+      const ring = new THREE.Mesh(ringGeo, m);
+      ring.position.z = -i * 6;
+      ring.rotation.z = rand(0, Math.PI * 2);
+      ring.userData.spin = rand(-0.4, 0.4);
+      tunnelGroup.add(ring);
+
+      const glow = makeGlowSprite(i % 2 ? "#00f6ff" : "#ff3dfc", 6.2);
+      glow.userData._glow.type = "ring";
+      glow.position.set(0, 0, 0);
+      ring.add(glow);
+
+      rings.push(ring);
+    }
+
+    // Star-ish dust
+    const dustGeo = new THREE.BufferGeometry();
+    const dustCount = 1500;
+    const dustPos = new Float32Array(dustCount * 3);
+    for (let i = 0; i < dustCount; i++) {
+      dustPos[i * 3 + 0] = rand(-60, 60);
+      dustPos[i * 3 + 1] = rand(-35, 35);
+      dustPos[i * 3 + 2] = rand(-260, 20);
+    }
+    dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos, 3));
+    const dustMat = new THREE.PointsMaterial({
+      size: 0.08,
+      color: 0x66ccff,
+      transparent: true,
+      opacity: 0.7,
+      depthWrite: false
+    });
+    const dust = new THREE.Points(dustGeo, dustMat);
+    scene.add(dust);
+
+    // -----------------------------
+    // Player ship
+    // -----------------------------
+    const ship = new THREE.Group();
+    scene.add(ship);
+
+    const shipBody = new THREE.Mesh(
+      new THREE.ConeGeometry(0.55, 1.6, 10),
+      neonMat("#00f6ff", 1.8)
+    );
+    shipBody.rotation.x = Math.PI / 2;
+    ship.add(shipBody);
+
+    const shipCoreGlow = makeGlowSprite("#00f6ff", 2.8);
+    shipCoreGlow.position.set(0, 0, -0.2);
+    ship.add(shipCoreGlow);
+
+    ship.position.set(0, 0, 6);
+
+    const player = {
+      pos: new THREE.Vector3(0, 0, 6),
+      vel: new THREE.Vector3(),
+      aim: new THREE.Vector3(0, 0, -1),
+      fireCooldown: 0,
+      hp: 3,
+      score: 0,
+      combo: 0,
+      comboTimer: 0
+    };
+
+    const stats = {
+      timeAlive: 0,
+      maxCombo: 0
+    };
+
+    // -----------------------------
+    // Input
+    // -----------------------------
+    const keys = new Set();
+    let firing = false;
+    let mouseX = 0, mouseY = 0;
+
+    function startNewGame() {
+      // Clear entities
+      for (const en of enemies) scene.remove(en);
+      enemies.length = 0;
+      for (const bu of bullets) scene.remove(bu);
+      bullets.length = 0;
+      for (const s of sparks) {
+        // they’re sprites in scene already; mark dead and pool
+        s.userData.life = 0;
+      }
+      sparks.length = 0;
+
+      // Reset player + stats
+      player.pos.set(0, 0, 6);
+      player.vel.set(0, 0, 0);
+      ship.position.copy(player.pos);
+      player.fireCooldown = 0;
+      player.hp = 3;
+      player.score = 0;
+      player.combo = 0;
+      player.comboTimer = 0;
+
+      stats.timeAlive = 0;
+      stats.maxCombo = 0;
+
+      spawnTimer = 0;
+      difficulty = 1;
+      shake = 0;
+      pulse = 0;
+
+      gameState = GAME_STATE.PLAYING;
+      gameOverTimer = 0;
+      setOverlay(false);
+    }
+
+    function goToAttract() {
+      gameState = GAME_STATE.ATTRACT;
+      setOverlay(true,
+`NEON TUNNEL SHOOTER
+
+ENTER — START
+WASD/ARROWS — MOVE
+MOUSE — AIM
+CLICK/SPACE — SHOOT
+ESC — PAUSE
+
+(try not to stare directly into the neon)`
+      );
+    }
+
+    function goToGameOver() {
+      gameState = GAME_STATE.GAME_OVER;
+      gameOverTimer = 0;
+      setOverlay(true, ""); // fill in during update
+    }
+
+    addEventListener("keydown", (e) => {
+      keys.add(e.code);
+
+      if (e.code === "Space") firing = true;
+
+      if (e.code === "Enter") {
+        if (gameState === GAME_STATE.ATTRACT || gameState === GAME_STATE.GAME_OVER) startNewGame();
+      }
+
+      if (e.code === "Escape") {
+        if (gameState === GAME_STATE.PLAYING) {
+          gameState = GAME_STATE.PAUSED;
+          setOverlay(true, "PAUSED\n\nPress ESC to resume");
+        } else if (gameState === GAME_STATE.PAUSED) {
+          gameState = GAME_STATE.PLAYING;
+          setOverlay(false);
+        }
+      }
+    });
+
+    addEventListener("keyup", (e) => {
+      keys.delete(e.code);
+      if (e.code === "Space") firing = false;
+    });
+
+    addEventListener("mousedown", () => firing = true);
+    addEventListener("mouseup", () => firing = false);
+
+    addEventListener("mousemove", (e) => {
+      mouseX = (e.clientX / innerWidth) * 2 - 1;
+      mouseY = -(e.clientY / innerHeight) * 2 + 1;
+    });
+
+    // -----------------------------
+    // Bullets
+    // -----------------------------
+    const bullets = [];
+    const bulletGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.9, 10);
+    const bulletMat = neonMat("#ff3dfc", 2.1);
+
+    function spawnBullet() {
+      const b = new THREE.Mesh(bulletGeo, bulletMat);
+      b.rotation.x = Math.PI / 2;
+      b.position.copy(ship.position).add(new THREE.Vector3(0, 0, -1.0));
+      b.userData.vel = player.aim.clone().multiplyScalar(45);
+      b.userData.life = 1.8;
+
+      const glow = makeGlowSprite("#ff3dfc", 1.4);
+      glow.position.set(0, 0, 0);
+      b.add(glow);
+
+      scene.add(b);
+      bullets.push(b);
+    }
+
+    // -----------------------------
+    // Enemies
+    // -----------------------------
+    const enemies = [];
+    const enemyGeos = [
+      new THREE.IcosahedronGeometry(0.9, 0),
+      new THREE.OctahedronGeometry(0.85, 0),
+      new THREE.TetrahedronGeometry(0.95, 0),
+    ];
+    const enemyColors = ["#7CFF00", "#00f6ff", "#ff3dfc"];
+
+    let spawnTimer = 0;
+    let difficulty = 1;
+
+    function spawnEnemy() {
+      const geo = enemyGeos[Math.floor(Math.random() * enemyGeos.length)];
+      const col = enemyColors[Math.floor(Math.random() * enemyColors.length)];
+      const m = neonMat(col, 1.65);
+
+      const e = new THREE.Mesh(geo, m);
+      e.position.set(rand(-8, 8), rand(-4.5, 4.5), rand(-120, -60));
+      e.userData.vel = new THREE.Vector3(rand(-1, 1), rand(-0.5, 0.5), rand(16, 22) * (0.7 + difficulty * 0.08));
+      e.userData.rot = new THREE.Vector3(rand(-2, 2), rand(-2, 2), rand(-2, 2));
+      e.userData.r = 1.0;
+      e.userData.hp = 1;
+
+      const glow = makeGlowSprite(col, 3.8);
+      e.add(glow);
+
+      scene.add(e);
+      enemies.push(e);
+    }
+
+    // -----------------------------
+    // Particles (simple pooled sprites)
+    // -----------------------------
+    const sparks = [];
+    const sparkPool = [];
+    const MAX_SPARKS = 400;
+
+    function getSpark() {
+      if (sparkPool.length) return sparkPool.pop();
+      const s = makeGlowSprite("#ffffff", 1.0);
+      s.userData.vel = new THREE.Vector3();
+      s.userData.life = 0;
+      s.userData.col = new THREE.Color();
+      scene.add(s);
+      return s;
+    }
+    function releaseSpark(s) {
+      s.visible = false;
+      sparkPool.push(s);
+    }
+
+    function burst(pos, colorHex, count = 18, force = 18) {
+      const base = new THREE.Color(colorHex);
+      for (let i = 0; i < count; i++) {
+        if (sparks.length >= MAX_SPARKS) break;
+        const s = getSpark();
+        s.visible = true;
+        s.position.copy(pos);
+        s.material.color.copy(base);
+        s.scale.setScalar(rand(0.6, 1.6));
+
+        if (s.userData._glow) s.userData._glow.baseColor.copy(base);
+
+        const dir = new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-0.2, 1)).normalize();
+        s.userData.vel.copy(dir.multiplyScalar(rand(force * 0.4, force))).add(new THREE.Vector3(0, 0, 10));
+        s.userData.life = rand(0.35, 0.8);
+        sparks.push(s);
+      }
+    }
+
+    // -----------------------------
+    // Collision helpers
+    // -----------------------------
+    function sphereHit(aPos, aR, bPos, bR) {
+      return aPos.distanceToSquared(bPos) <= (aR + bR) * (aR + bR);
+    }
+
+    // -----------------------------
+    // Camera shake + pulse
+    // -----------------------------
+    let shake = 0;
+    let pulse = 0;
+
+    // -----------------------------
+    // Resize
+    // -----------------------------
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    });
+
+    // -----------------------------
+    // Boot to attract
+    // -----------------------------
+    goToAttract();
+
+    // -----------------------------
+    // Main loop
+    // -----------------------------
+    function tick() {
+      const dt = Math.min(clock.getDelta(), 0.033);
+
+      // Always keep tunnel moving (attract mode vibe)
+      for (const ring of rings) {
+        ring.position.z += dt * 18;
+        ring.rotation.z += ring.userData.spin * dt;
+        if (ring.position.z > 10) ring.position.z -= RING_COUNT * 6;
+      }
+
+      // Dust scroll always
+      const p = dust.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const z = p.getZ(i) + dt * 22;
+        p.setZ(i, z > 20 ? z - 280 : z);
+      }
+      p.needsUpdate = true;
+
+      // Idle ship sway in attract / paused / game over (tiny)
+      if (gameState !== GAME_STATE.PLAYING) {
+        ship.position.x = Math.sin(clock.elapsedTime * 0.8) * 0.25;
+        ship.position.y = Math.sin(clock.elapsedTime * 0.6) * 0.18;
+        ship.rotation.z = Math.sin(clock.elapsedTime * 0.9) * 0.06;
+        ship.rotation.x = Math.sin(clock.elapsedTime * 0.7) * 0.04;
+      }
+
+      // Aim stays live (nice feel even on menus)
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera({ x: mouseX, y: mouseY }, camera);
+      const aimPoint = new THREE.Vector3();
+      ray.ray.at(30, aimPoint);
+      player.aim.copy(aimPoint.sub(ship.position)).normalize();
+
+      // If paused: render and bail (no sim)
+      if (gameState === GAME_STATE.PAUSED) {
+        // Glow update
+        for (let i = 0; i < glowSprites.length; i++) {
+          const spr = glowSprites[i];
+          if (!spr.visible || !spr.parent) continue;
+          updateGlowSprite(spr);
+        }
+        renderer.render(scene, camera);
+        requestAnimationFrame(tick);
+        return;
+      }
+
+      // ATTRACT: no enemies/bullets, just render
+      if (gameState === GAME_STATE.ATTRACT) {
+        hud.textContent = "";
+        tunnelGroup.rotation.z = Math.sin(clock.elapsedTime * 0.6) * 0.03;
+        tunnelGroup.rotation.y = Math.sin(clock.elapsedTime * 0.4) * 0.02;
+
+        const camTarget = new THREE.Vector3(0, 2.5, 10);
+        camera.position.lerp(camTarget, 1 - Math.exp(-dt * 2.8));
+        camera.lookAt(0, 0, -40);
+
+        for (let i = 0; i < glowSprites.length; i++) {
+          const spr = glowSprites[i];
+          if (!spr.visible || !spr.parent) continue;
+          updateGlowSprite(spr);
+        }
+
+        renderer.render(scene, camera);
+        requestAnimationFrame(tick);
+        return;
+      }
+
+      // GAME OVER: let particles finish, but no spawning/shooting
+      if (gameState === GAME_STATE.GAME_OVER) {
+        gameOverTimer += dt;
+
+        // Let sparks fade naturally
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          const s = sparks[i];
+          s.position.addScaledVector(s.userData.vel, dt);
+          s.userData.vel.multiplyScalar(Math.exp(-dt * 2.6));
+          s.userData.life -= dt;
+          s.scale.multiplyScalar(Math.exp(-dt * 1.6));
+          if (s.userData.life <= 0) {
+            sparks.splice(i, 1);
+            releaseSpark(s);
+          }
+        }
+
+        // Soften camera
+        const camTarget = new THREE.Vector3(0, 2.5, 10);
+        camera.position.lerp(camTarget, 1 - Math.exp(-dt * 2.8));
+        camera.lookAt(0, 0, -40);
+
+        tunnelGroup.rotation.z = Math.sin(clock.elapsedTime * 0.6) * 0.03;
+        tunnelGroup.rotation.y = Math.sin(clock.elapsedTime * 0.4) * 0.02;
+
+        const canRestart = gameOverTimer > 0.75;
+
+        setOverlay(true,
+`GAME OVER
+
+SCORE: ${player.score}
+MAX COMBO: x${stats.maxCombo}
+SURVIVED: ${fmtTime(stats.timeAlive)}
+
+${canRestart ? "PRESS ENTER TO RESTART" : ""}`
+        );
+
+        hud.textContent = "";
+
+        for (let i = 0; i < glowSprites.length; i++) {
+          const spr = glowSprites[i];
+          if (!spr.visible || !spr.parent) continue;
+          updateGlowSprite(spr);
+        }
+
+        renderer.render(scene, camera);
+        requestAnimationFrame(tick);
+        return;
+      }
+
+      // -----------------------------
+      // PLAYING (your original simulation)
+      // -----------------------------
+      if (gameState === GAME_STATE.PLAYING) {
+        stats.timeAlive += dt;
+
+        // Difficulty ramps slowly
+        difficulty = 1 + clock.elapsedTime * 0.02;
+
+        // Movement
+        const accel = 24;
+        const maxSpeed = 10.5;
+
+        const inputX =
+          (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) -
+          (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
+        const inputY =
+          (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) -
+          (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
+
+        player.vel.x = lerp(player.vel.x, inputX * maxSpeed, 1 - Math.exp(-dt * accel));
+        player.vel.y = lerp(player.vel.y, inputY * maxSpeed, 1 - Math.exp(-dt * accel));
+
+        player.pos.x += player.vel.x * dt;
+        player.pos.y += player.vel.y * dt;
+
+        // Clamp to tunnel-ish bounds
+        player.pos.x = clamp(player.pos.x, -7.6, 7.6);
+        player.pos.y = clamp(player.pos.y, -4.3, 4.3);
+
+        ship.position.copy(player.pos);
+
+        // Ship tilt
+        ship.rotation.z = -player.vel.x * 0.035;
+        ship.rotation.x = player.vel.y * 0.025;
+
+        // Fire
+        player.fireCooldown -= dt;
+        if (firing && player.fireCooldown <= 0) {
+          spawnBullet();
+          player.fireCooldown = 0.09;
+          pulse = 0.35;
+        }
+
+        // Spawn enemies
+        spawnTimer -= dt;
+        const spawnRate = Math.max(0.18, 0.65 - difficulty * 0.03);
+        if (spawnTimer <= 0) {
+          spawnEnemy();
+          if (Math.random() < 0.25 + difficulty * 0.01) spawnEnemy();
+          spawnTimer = spawnRate;
+        }
+
+        // Update bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          b.position.addScaledVector(b.userData.vel, dt);
+          b.userData.life -= dt;
+
+          if (b.userData.life <= 0 || b.position.z < -160) {
+            scene.remove(b);
+            bullets.splice(i, 1);
+          }
+        }
+
+        // Update enemies + collisions
+        player.comboTimer -= dt;
+        if (player.comboTimer <= 0) player.combo = 0;
+
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          const e = enemies[i];
+          e.position.addScaledVector(e.userData.vel, dt);
+          e.rotation.x += e.userData.rot.x * dt;
+          e.rotation.y += e.userData.rot.y * dt;
+          e.rotation.z += e.userData.rot.z * dt;
+
+          // Bullet hits
+          let killed = false;
+          for (let j = bullets.length - 1; j >= 0; j--) {
+            const b = bullets[j];
+            if (sphereHit(e.position, e.userData.r, b.position, 0.35)) {
+              // remove bullet
+              scene.remove(b);
+              bullets.splice(j, 1);
+
+              e.userData.hp -= 1;
+              burst(e.position, "#" + e.material.color.getHexString(), 20, 20);
+              shake = Math.min(1.0, shake + 0.18);
+              pulse = Math.min(0.8, pulse + 0.22);
+
+              if (e.userData.hp <= 0) {
+                killed = true;
+                break;
+              }
+            }
+          }
+
+          if (killed) {
+            const col = "#" + e.material.color.getHexString();
+            burst(e.position, col, 35, 26);
+            scene.remove(e);
+            enemies.splice(i, 1);
+
+            player.combo += 1;
+            player.comboTimer = 1.25;
+            stats.maxCombo = Math.max(stats.maxCombo, player.combo);
+
+            const bonus = Math.floor(10 * (1 + player.combo * 0.15));
+            player.score += bonus;
+            continue;
+          }
+
+          // Player collision (enemy reaches near ship)
+          if (e.position.z > ship.position.z - 0.8) {
+            if (sphereHit(e.position, 1.0, ship.position, 0.85)) {
+              burst(ship.position, "#00f6ff", 40, 22);
+              shake = 1.0;
+              player.hp -= 1;
+            }
+            scene.remove(e);
+            enemies.splice(i, 1);
+            player.combo = 0;
+            player.comboTimer = 0;
+
+            if (player.hp <= 0) {
+              // Proper game over (NEW)
+              burst(ship.position, "#00f6ff", 70, 28);
+
+              // clear remaining enemies/bullets for clean gameover screen
+              for (const en of enemies) scene.remove(en);
+              enemies.length = 0;
+              for (const bu of bullets) scene.remove(bu);
+              bullets.length = 0;
+
+              goToGameOver();
+              break;
+            }
+          }
+        }
+
+        // Update sparks
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          const s = sparks[i];
+          s.position.addScaledVector(s.userData.vel, dt);
+          s.userData.vel.multiplyScalar(Math.exp(-dt * 2.6));
+          s.userData.life -= dt;
+          s.scale.multiplyScalar(Math.exp(-dt * 1.6));
+          if (s.userData.life <= 0) {
+            sparks.splice(i, 1);
+            releaseSpark(s);
+          }
+        }
+
+        // Camera follow + shake + pulse
+        const camTarget = new THREE.Vector3(player.pos.x * 0.25, player.pos.y * 0.18 + 2.5, 10);
+        camera.position.lerp(camTarget, 1 - Math.exp(-dt * 4.5));
+        camera.lookAt(player.pos.x * 0.15, player.pos.y * 0.1, -40);
+
+        shake = Math.max(0, shake - dt * 1.4);
+        pulse = Math.max(0, pulse - dt * 2.2);
+
+        if (shake > 0) {
+          camera.position.x += rand(-1, 1) * shake * 0.12;
+          camera.position.y += rand(-1, 1) * shake * 0.10;
+        }
+
+        // Subtle tunnel group wobble
+        tunnelGroup.rotation.z = Math.sin(clock.elapsedTime * 0.6) * 0.03;
+        tunnelGroup.rotation.y = Math.sin(clock.elapsedTime * 0.4) * 0.02;
+
+        // Glow post-update
+        for (let i = 0; i < glowSprites.length; i++) {
+          const spr = glowSprites[i];
+          if (!spr.visible || !spr.parent) continue;
+          updateGlowSprite(spr);
+        }
+
+        // HUD
+        hud.textContent =
+          `HP: ${"█".repeat(player.hp)}${"░".repeat(3 - player.hp)}\n` +
+          `Score: ${player.score}\n` +
+          `Combo: x${player.combo}\n` +
+          `Max:  x${stats.maxCombo}\n` +
+          `Time:  ${fmtTime(stats.timeAlive)}\n` +
+          `Enemies: ${enemies.length}\n` +
+          `Difficulty: ${difficulty.toFixed(2)}`;
+
+        // Subtle screen flash on firing/impact
+        renderer.setClearColor(new THREE.Color(0x02030a).lerp(new THREE.Color(0x070014), pulse * 0.35), 1);
+
+        renderer.render(scene, camera);
+        requestAnimationFrame(tick);
+        return;
+      }
+
+      // fallback
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    }
+
+    tick();
+  </script>
+</body>
+</html>
+
