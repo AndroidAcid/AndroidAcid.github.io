@@ -659,7 +659,7 @@
       e.fireCd -= dt;
       if (e.fireCd <= 0 && e.y > -20 && e.y < H+20) {
         shootEnemy(e, e.firePattern);
-        e.fireCd = e.fireRate + rand(0.2, 0.5);
+        e.fireCd = e.fireRate + rand(0.5, 1.0);
       }
 
       // remove offscreen (passed)
