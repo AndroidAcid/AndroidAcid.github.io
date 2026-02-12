@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Srater OS — Signal Over Noise</title>
+
+<style>
+:root{
+  --bg:#000000;
+  --bg2:#060606;
+  --card:rgba(255,255,255,.05);
+  --stroke:rgba(0,255,120,.12);
+  --green:#00ff88;
+  --green-dim:#00aa66;
+  --text:#e8ffe8;
+  --muted:#7affb7;
+  --mono:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --sans:system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:var(--sans);
+  background:radial-gradient(circle at 50% 0%, #02120a 0%, #000 60%);
+  color:var(--text);
+  overflow-x:hidden;
+}
+
+/* subtle grid */
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(rgba(0,255,120,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,120,.04) 1px, transparent 1px);
+  background-size:50px 50px;
+  opacity:.25;
+}
+
+/* NAV */
+header{
+  position:sticky;
+  top:0;
+  z-index:50;
+  backdrop-filter:blur(6px);
+  background:rgba(0,0,0,.85);
+  border-bottom:1px solid var(--stroke);
+}
+
+.wrap{max-width:1100px;margin:auto;padding:0 20px}
+
+.nav{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:16px 0;
+}
+
+.brand{
+  font-weight:700;
+  letter-spacing:2px;
+}
+
+nav a{
+  color:var(--muted);
+  text-decoration:none;
+  margin-left:20px;
+  font-size:14px;
+}
+nav a:hover{color:var(--green)}
+
+/* HERO */
+.hero{
+  padding:80px 0 40px;
+  display:grid;
+  grid-template-columns:1.1fr .9fr;
+  gap:30px;
+  align-items:center;
+}
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr}
+}
+
+h1{
+  font-size:46px;
+  margin:0 0 15px;
+  letter-spacing:1px;
+}
+h1 span{
+  color:var(--green);
+}
+
+.lead{
+  color:var(--muted);
+  line-height:1.6;
+  max-width:550px;
+}
+
+.btn{
+  display:inline-block;
+  margin-top:20px;
+  padding:12px 20px;
+  border:1px solid var(--green);
+  color:var(--green);
+  text-decoration:none;
+  transition:.2s;
+}
+.btn:hover{
+  background:var(--green);
+  color:#000;
+  box-shadow:0 0 20px var(--green);
+}
+
+/* MASK VISUAL */
+.maskBox{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.maskBox svg{
+  width:260px;
+  opacity:.85;
+  filter:drop-shadow(0 0 20px rgba(0,255,136,.15));
+}
+
+/* TERMINAL */
+.card{
+  border:1px solid var(--stroke);
+  background:var(--bg2);
+  border-radius:14px;
+  margin-top:40px;
+  overflow:hidden;
+}
+
+.cardHeader{
+  padding:12px 16px;
+  border-bottom:1px solid var(--stroke);
+  font-family:var(--mono);
+  font-size:13px;
+  color:var(--muted);
+}
+
+.term{
+  padding:20px;
+  font-family:var(--mono);
+  font-size:14px;
+  line-height:1.6;
+}
+
+.prompt{color:var(--green)}
+.out{color:var(--muted)}
+.warn{color:#ffaa00}
+.bad{color:#ff4444}
+
+/* SECTIONS */
+section{
+  padding:70px 0;
+  border-top:1px solid var(--stroke);
+}
+
+h2{
+  text-align:center;
+  color:var(--green);
+  margin-bottom:40px;
+}
+
+.features{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:30px;
+}
+
+.feature{
+  width:280px;
+  padding:20px;
+  border:1px solid var(--stroke);
+  background:var(--card);
+}
+.feature h3{color:var(--green)}
+.feature p{color:var(--muted);line-height:1.6}
+
+/* FOOTER */
+footer{
+  padding:40px 0;
+  text-align:center;
+  font-size:13px;
+  color:var(--muted);
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="wrap nav">
+    <div class="brand">SRATER OS</div>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a href="#manifesto">Manifesto</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<div class="hero">
+  <div>
+    <h1><span>Signal</span> Over Noise</h1>
+    <p class="lead">
+      Srater OS is a terminal-centric operating system designed for operators
+      who prefer silence, encryption, and blinking cursors over distractions.
+    </p>
+    <a class="btn" href="#download">Download ISO</a>
+  </div>
+
+  <div class="maskBox">
+    <!-- Generic stylized mask SVG (non-branded) -->
+    <svg viewBox="0 0 200 220" fill="none" stroke="#00ff88" stroke-width="3">
+      <path d="M100 10 C40 10 20 60 20 110 C20 170 60 210 100 210 C140 210 180 170 180 110 C180 60 160 10 100 10 Z"/>
+      <path d="M60 100 Q80 90 100 100 Q120 90 140 100"/>
+      <circle cx="75" cy="85" r="8"/>
+      <circle cx="125" cy="85" r="8"/>
+    </svg>
+  </div>
+</div>
+
+<div class="card">
+  <div class="cardHeader">root@srater:~</div>
+  <div class="term">
+    <div><span class="prompt">root@srater:~#</span> whoami</div>
+    <div class="out">operator</div>
+    <div><span class="prompt">root@srater:~#</span> status</div>
+    <div class="out">Signal detected. Noise filtered.</div>
+    <div><span class="prompt">root@srater:~#</span> scan --network</div>
+    <div class="warn">Network active. Encryption recommended.</div>
+    <div><span class="prompt">root@srater:~#</span> _</div>
+  </div>
+</div>
+
+<section id="features">
+  <h2>Capabilities</h2>
+  <div class="features">
+    <div class="feature">
+      <h3>Minimal Surface</h3>
+      <p>No unnecessary UI. Terminal-first workflow with hardened defaults.</p>
+    </div>
+    <div class="feature">
+      <h3>Research Toolkit</h3>
+      <p>Preloaded auditing and analysis utilities for controlled environments.</p>
+    </div>
+    <div class="feature">
+      <h3>Stealth Theme</h3>
+      <p>Dark visual profile designed for low visibility and focused sessions.</p>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <h2>Download</h2>
+  <div style="text-align:center;">
+    <a class="btn" href="#">Srater-OS-2026.iso</a>
+  </div>
+</section>
+
+<section id="manifesto">
+  <h2>Manifesto</h2>
+  <div class="card">
+    <div class="term">
+      <div class="out">
+        We do not shout.<br>
+        We do not flash.<br>
+        We execute.<br><br>
+        Srater OS is a concept system. A parody distro aesthetic.<br>
+        Built for demonstration, not deception.
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  © 2026 Srater OS — The mask is symbolic.
+</footer>
+
+</main>
+
+</body>
+</html>
