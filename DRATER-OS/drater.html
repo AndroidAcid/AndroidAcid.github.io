@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drater OS | We Are The Signal</title>
+
+<style>
+:root{
+  --bg:#000;
+  --bg-soft:#050505;
+  --green:#00ff88;
+  --green-dim:#00995c;
+  --text:#eaffea;
+  --muted:#6affb0;
+  --stroke:rgba(0,255,136,.15);
+  --mono:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:var(--mono);
+  background:#000;
+  color:var(--text);
+  overflow-x:hidden;
+}
+
+/* Subtle digital rain background */
+canvas{
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  opacity:.08;
+}
+
+/* NAV */
+header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:20px 40px;
+  border-bottom:1px solid var(--stroke);
+  background:rgba(0,0,0,.85);
+}
+
+header div{
+  font-size:18px;
+  letter-spacing:2px;
+}
+
+nav a{
+  color:var(--muted);
+  text-decoration:none;
+  margin-left:20px;
+  font-size:14px;
+}
+nav a:hover{color:var(--green)}
+
+/* HERO */
+.hero{
+  text-align:center;
+  padding:120px 20px 80px;
+}
+
+.glitch{
+  font-size:56px;
+  text-transform:uppercase;
+  letter-spacing:3px;
+  position:relative;
+}
+.glitch::before,
+.glitch::after{
+  content:attr(data-text);
+  position:absolute;
+  left:0;
+  width:100%;
+}
+.glitch::before{
+  color:#00ffaa;
+  clip-path:inset(0 0 50% 0);
+  animation:glitchTop 2s infinite linear alternate-reverse;
+}
+.glitch::after{
+  color:#00ff00;
+  clip-path:inset(50% 0 0 0);
+  animation:glitchBot 1.5s infinite linear alternate-reverse;
+}
+
+@keyframes glitchTop{
+  0%{transform:translateX(0)}
+  50%{transform:translateX(-3px)}
+  100%{transform:translateX(0)}
+}
+@keyframes glitchBot{
+  0%{transform:translateX(0)}
+  50%{transform:translateX(3px)}
+  100%{transform:translateX(0)}
+}
+
+.hero p{
+  max-width:600px;
+  margin:25px auto;
+  color:var(--muted);
+  line-height:1.6;
+}
+
+/* BUTTON */
+.btn{
+  display:inline-block;
+  padding:12px 24px;
+  border:1px solid var(--green);
+  color:var(--green);
+  text-decoration:none;
+  margin:10px;
+  transition:.2s;
+}
+.btn:hover{
+  background:var(--green);
+  color:#000;
+  box-shadow:0 0 20px var(--green);
+}
+
+/* TERMINAL */
+.terminal{
+  max-width:900px;
+  margin:60px auto;
+  padding:25px;
+  border:1px solid var(--green-dim);
+  background:var(--bg-soft);
+  box-shadow:0 0 40px rgba(0,255,136,.08);
+  font-size:14px;
+  line-height:1.6;
+}
+
+.prompt{color:var(--green)}
+.output{color:var(--muted)}
+.error{color:#ff4444}
+
+/* SECTION */
+section{
+  padding:80px 20px;
+  border-top:1px solid var(--stroke);
+}
+
+h2{
+  text-align:center;
+  color:var(--green);
+  margin-bottom:40px;
+}
+
+.features{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:30px;
+}
+
+.card{
+  width:280px;
+  padding:20px;
+  border:1px solid var(--stroke);
+  background:rgba(255,255,255,.03);
+}
+.card h3{color:var(--green)}
+.card p{color:var(--muted)}
+
+footer{
+  text-align:center;
+  padding:50px;
+  font-size:12px;
+  color:var(--muted);
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="matrix"></canvas>
+
+<header>
+  <div>DRATER OS</div>
+  <nav>
+    <a href="#features">Capabilities</a>
+    <a href="#download">Download</a>
+    <a href="#manifesto">Manifesto</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div class="glitch" data-text="WE ARE DRATER">
+    WE ARE DRATER
+  </div>
+  <p>
+    Drater OS is a terminal-first operating system for digital rebels,
+    command-line purists, and people who prefer blinking cursors over GUI illusions.
+  </p>
+  <a href="#download" class="btn">Download ISO</a>
+  <a href="#manifesto" class="btn">Read Manifesto</a>
+</div>
+
+<div class="terminal">
+  <div><span class="prompt">root@drater:~#</span> whoami</div>
+  <div class="output">signal</div>
+  <div><span class="prompt">root@drater:~#</span> status</div>
+  <div class="output">Operating outside the noise.</div>
+  <div><span class="prompt">root@drater:~#</span> scan --internet</div>
+  <div class="error">[!] Internet detected. Encryption recommended.</div>
+  <div><span class="prompt">root@drater:~#</span> _</div>
+</div>
+
+<section id="features">
+  <h2>Capabilities</h2>
+  <div class="features">
+    <div class="card">
+      <h3>Minimal Surface</h3>
+      <p>No unnecessary UI clutter. Just terminal, tools, and silence.</p>
+    </div>
+    <div class="card">
+      <h3>Offensive Toolkit</h3>
+      <p>Bundled utilities for research, auditing, and dramatic typing.</p>
+    </div>
+    <div class="card">
+      <h3>Stealth Profile</h3>
+      <p>Designed to look intimidating even when compiling hello.c.</p>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <h2>Download</h2>
+  <div style="text-align:center;">
+    <a class="btn" href="#">Drater-OS-2026.iso</a>
+  </div>
+</section>
+
+<section id="manifesto">
+  <h2>Manifesto</h2>
+  <div class="terminal">
+    <div class="output">
+      We do not forget.<br>
+      We do not sleep.<br>
+      We debug.<br><br>
+      Drater OS is a concept. A parody. A terminal with ambition.
+    </div>
+  </div>
+</section>
+
+<footer>
+  © 2026 Drater OS — The signal persists.
+</footer>
+
+<script>
+/* MATRIX BACKGROUND */
+const canvas = document.getElementById("matrix");
+const ctx = canvas.getContext("2d");
+
+canvas.height = window.innerHeight;
+canvas.width = window.innerWidth;
+
+const letters = "01DRATEROS";
+const fontSize = 14;
+const columns = canvas.width / fontSize;
+const drops = [];
+
+for(let x = 0; x < columns; x++)
+  drops[x] = 1;
+
+function draw(){
+  ctx.fillStyle = "rgba(0,0,0,0.08)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "#00ff88";
+  ctx.font = fontSize + "px monospace";
+
+  for(let i = 0; i < drops.length; i++){
+    const text = letters[Math.floor(Math.random()*letters.length)];
+    ctx.fillText(text, i*fontSize, drops[i]*fontSize);
+
+    if(drops[i]*fontSize > canvas.height && Math.random() > 0.975)
+      drops[i] = 0;
+
+    drops[i]++;
+  }
+}
+setInterval(draw, 35);
+</script>
+
+</body>
+</html>
