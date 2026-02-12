@@ -3,29 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Srater OS — Signal Over Noise</title>
+<title>Drater OS™ — Signal. Silence. Execution.</title>
 
 <style>
 :root{
-  --bg:#000000;
-  --bg2:#060606;
+  --bg0:#050505;
+  --bg1:#0b0f0c;
   --card:rgba(255,255,255,.05);
-  --stroke:rgba(0,255,120,.12);
-  --green:#00ff88;
-  --green-dim:#00aa66;
-  --text:#e8ffe8;
+  --stroke:rgba(0,255,136,.12);
+  --text:#e6ffe6;
   --muted:#7affb7;
+  --accent:#00ff88;
+  --accent2:#00ffaa;
   --mono:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --sans:system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --sans:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
 }
 
 *{box-sizing:border-box}
 body{
   margin:0;
   font-family:var(--sans);
-  background:radial-gradient(circle at 50% 0%, #02120a 0%, #000 60%);
   color:var(--text);
-  overflow-x:hidden;
+  background:
+    radial-gradient(800px 500px at 20% 10%, rgba(0,255,136,.08), transparent 60%),
+    radial-gradient(700px 400px at 80% 20%, rgba(0,255,136,.06), transparent 60%),
+    linear-gradient(180deg, var(--bg0), var(--bg1));
 }
 
 /* subtle grid */
@@ -35,17 +37,16 @@ body::before{
   inset:0;
   pointer-events:none;
   background:
-    linear-gradient(rgba(0,255,120,.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,255,120,.04) 1px, transparent 1px);
-  background-size:50px 50px;
+    linear-gradient(rgba(0,255,136,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,136,.04) 1px, transparent 1px);
+  background-size:48px 48px;
   opacity:.25;
 }
 
-/* NAV */
+/* HEADER */
 header{
   position:sticky;
   top:0;
-  z-index:50;
   backdrop-filter:blur(6px);
   background:rgba(0,0,0,.85);
   border-bottom:1px solid var(--stroke);
@@ -61,8 +62,17 @@ header{
 }
 
 .brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
   font-weight:700;
-  letter-spacing:2px;
+  letter-spacing:1px;
+}
+
+.maskLogo{
+  width:32px;
+  height:32px;
+  opacity:.9;
 }
 
 nav a{
@@ -71,11 +81,11 @@ nav a{
   margin-left:20px;
   font-size:14px;
 }
-nav a:hover{color:var(--green)}
+nav a:hover{color:var(--accent)}
 
 /* HERO */
 .hero{
-  padding:80px 0 40px;
+  padding:70px 0 30px;
   display:grid;
   grid-template-columns:1.1fr .9fr;
   gap:30px;
@@ -86,103 +96,106 @@ nav a:hover{color:var(--green)}
 }
 
 h1{
-  font-size:46px;
-  margin:0 0 15px;
-  letter-spacing:1px;
+  margin:0 0 10px;
+  font-size:44px;
 }
 h1 span{
-  color:var(--green);
+  background:linear-gradient(90deg,var(--accent2),var(--accent));
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
 }
 
 .lead{
   color:var(--muted);
-  line-height:1.6;
   max-width:550px;
+  line-height:1.6;
 }
 
 .btn{
   display:inline-block;
   margin-top:20px;
   padding:12px 20px;
-  border:1px solid var(--green);
-  color:var(--green);
+  border:1px solid var(--accent);
+  color:var(--accent);
   text-decoration:none;
   transition:.2s;
 }
 .btn:hover{
-  background:var(--green);
+  background:var(--accent);
   color:#000;
-  box-shadow:0 0 20px var(--green);
+  box-shadow:0 0 20px var(--accent);
 }
 
-/* MASK VISUAL */
-.maskBox{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-}
-
-.maskBox svg{
-  width:260px;
-  opacity:.85;
-  filter:drop-shadow(0 0 20px rgba(0,255,136,.15));
-}
-
-/* TERMINAL */
+/* TERMINAL CARD */
 .card{
   border:1px solid var(--stroke);
-  background:var(--bg2);
-  border-radius:14px;
-  margin-top:40px;
+  border-radius:16px;
+  background:var(--card);
+  box-shadow:0 0 30px rgba(0,255,136,.05);
   overflow:hidden;
 }
 
 .cardHeader{
   padding:12px 16px;
-  border-bottom:1px solid var(--stroke);
   font-family:var(--mono);
   font-size:13px;
+  border-bottom:1px solid var(--stroke);
   color:var(--muted);
 }
 
 .term{
-  padding:20px;
+  padding:18px;
   font-family:var(--mono);
   font-size:14px;
   line-height:1.6;
 }
 
-.prompt{color:var(--green)}
+.prompt{color:var(--accent)}
 .out{color:var(--muted)}
 .warn{color:#ffaa00}
 .bad{color:#ff4444}
 
+/* MASK SIDE VISUAL */
+.maskBox{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+.maskBox svg{
+  width:240px;
+  opacity:.85;
+  filter:drop-shadow(0 0 25px rgba(0,255,136,.15));
+}
+
 /* SECTIONS */
 section{
-  padding:70px 0;
+  padding:60px 0;
   border-top:1px solid var(--stroke);
 }
 
 h2{
   text-align:center;
-  color:var(--green);
   margin-bottom:40px;
+  color:var(--accent);
 }
 
 .features{
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:center;
-  gap:30px;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:20px;
+}
+@media(max-width:900px){
+  .features{grid-template-columns:1fr}
 }
 
 .feature{
-  width:280px;
   padding:20px;
   border:1px solid var(--stroke);
-  background:var(--card);
+  border-radius:14px;
+  background:rgba(255,255,255,.04);
 }
-.feature h3{color:var(--green)}
+.feature h3{color:var(--accent)}
 .feature p{color:var(--muted);line-height:1.6}
 
 /* FOOTER */
@@ -199,7 +212,16 @@ footer{
 
 <header>
   <div class="wrap nav">
-    <div class="brand">SRATER OS</div>
+    <div class="brand">
+      <!-- simple anonymous-style mask icon -->
+      <svg class="maskLogo" viewBox="0 0 200 220" fill="none" stroke="#00ff88" stroke-width="4">
+        <path d="M100 10 C40 10 20 60 20 110 C20 170 60 210 100 210 C140 210 180 170 180 110 C180 60 160 10 100 10 Z"/>
+        <circle cx="75" cy="85" r="8"/>
+        <circle cx="125" cy="85" r="8"/>
+        <path d="M60 120 Q100 150 140 120"/>
+      </svg>
+      Drater OS™
+    </div>
     <nav>
       <a href="#features">Features</a>
       <a href="#download">Download</a>
@@ -212,35 +234,34 @@ footer{
 
 <div class="hero">
   <div>
-    <h1><span>Signal</span> Over Noise</h1>
+    <h1>We Are <span>Drater</span></h1>
     <p class="lead">
-      Srater OS is a terminal-centric operating system designed for operators
-      who prefer silence, encryption, and blinking cursors over distractions.
+      Drater OS™ is a parody security distribution built for terminal purists,
+      digital philosophers, and professionals who enjoy dramatic command lines.
     </p>
     <a class="btn" href="#download">Download ISO</a>
   </div>
 
   <div class="maskBox">
-    <!-- Generic stylized mask SVG (non-branded) -->
     <svg viewBox="0 0 200 220" fill="none" stroke="#00ff88" stroke-width="3">
       <path d="M100 10 C40 10 20 60 20 110 C20 170 60 210 100 210 C140 210 180 170 180 110 C180 60 160 10 100 10 Z"/>
-      <path d="M60 100 Q80 90 100 100 Q120 90 140 100"/>
       <circle cx="75" cy="85" r="8"/>
       <circle cx="125" cy="85" r="8"/>
+      <path d="M60 120 Q100 150 140 120"/>
     </svg>
   </div>
 </div>
 
 <div class="card">
-  <div class="cardHeader">root@srater:~</div>
+  <div class="cardHeader">root@drater:~</div>
   <div class="term">
-    <div><span class="prompt">root@srater:~#</span> whoami</div>
+    <div><span class="prompt">root@drater:~#</span> whoami</div>
     <div class="out">operator</div>
-    <div><span class="prompt">root@srater:~#</span> status</div>
-    <div class="out">Signal detected. Noise filtered.</div>
-    <div><span class="prompt">root@srater:~#</span> scan --network</div>
-    <div class="warn">Network active. Encryption recommended.</div>
-    <div><span class="prompt">root@srater:~#</span> _</div>
+    <div><span class="prompt">root@drater:~#</span> status</div>
+    <div class="out">Signal confirmed. Noise suppressed.</div>
+    <div><span class="prompt">root@drater:~#</span> scan --network</div>
+    <div class="warn">Network detected. Encryption advised.</div>
+    <div><span class="prompt">root@drater:~#</span> _</div>
   </div>
 </div>
 
@@ -248,16 +269,16 @@ footer{
   <h2>Capabilities</h2>
   <div class="features">
     <div class="feature">
-      <h3>Minimal Surface</h3>
-      <p>No unnecessary UI. Terminal-first workflow with hardened defaults.</p>
+      <h3>Terminal First</h3>
+      <p>Minimal UI surface. Maximum command authority.</p>
     </div>
     <div class="feature">
       <h3>Research Toolkit</h3>
-      <p>Preloaded auditing and analysis utilities for controlled environments.</p>
+      <p>Preloaded auditing utilities for controlled environments.</p>
     </div>
     <div class="feature">
-      <h3>Stealth Theme</h3>
-      <p>Dark visual profile designed for low visibility and focused sessions.</p>
+      <h3>Anonymous Theme</h3>
+      <p>Mask-inspired aesthetic with restrained green signal accents.</p>
     </div>
   </div>
 </section>
@@ -265,7 +286,7 @@ footer{
 <section id="download">
   <h2>Download</h2>
   <div style="text-align:center;">
-    <a class="btn" href="#">Srater-OS-2026.iso</a>
+    <a class="btn" href="#">Drater-OS-2026.iso</a>
   </div>
 </section>
 
@@ -275,17 +296,17 @@ footer{
     <div class="term">
       <div class="out">
         We do not shout.<br>
-        We do not flash.<br>
+        We do not crash.<br>
         We execute.<br><br>
-        Srater OS is a concept system. A parody distro aesthetic.<br>
-        Built for demonstration, not deception.
+        Drater OS™ is a parody concept distribution.<br>
+        Built for aesthetics. Not infiltration.
       </div>
     </div>
   </div>
 </section>
 
 <footer>
-  © 2026 Srater OS — The mask is symbolic.
+  © 2026 Drater OS™ — Masked, but mostly debugging.
 </footer>
 
 </main>
