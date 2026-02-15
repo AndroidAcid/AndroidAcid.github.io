@@ -1,0 +1,1288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>NEON INVADERS — Classic, but illegal amounts of glow (Psychedelia Mode)</title>
+<style>
+  :root{
+    --bg0:#05060a;
+    --bg1:#080a12;
+    --txt:#cfe9ff;
+    --c1:#28f7ff;   /* cyan */
+    --c2:#ff2df7;   /* magenta */
+    --c3:#b7ff3c;   /* lime */
+    --danger:#ff3b3b;
+    --amber:#ffcc66;
+  }
+  html,body{
+    margin:0; height:100%;
+    background: radial-gradient(1200px 700px at 20% 10%, #0c1030 0%, var(--bg0) 45%, #020208 100%);
+    overflow:hidden;
+    color:var(--txt);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  canvas{ display:block; width:100vw; height:100vh; image-rendering: pixelated; }
+
+  #hud{
+    position:fixed; left:12px; top:10px;
+    padding:10px 12px;
+    background: rgba(0,0,0,0.22);
+    border: 1px solid rgba(40,247,255,0.22);
+    border-radius: 14px;
+    box-shadow: 0 0 18px rgba(40,247,255,0.12), inset 0 0 18px rgba(255,45,247,0.05);
+    user-select:none;
+    min-width: 260px;
+    backdrop-filter: blur(4px);
+  }
+  #hud .row{ display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+  #hud b{ color:var(--c1); text-shadow:0 0 10px rgba(40,247,255,0.45); }
+  #hud .pill{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:4px 8px; border-radius: 999px;
+    border: 1px solid rgba(255,45,247,0.25);
+    background: rgba(255,45,247,0.06);
+    box-shadow: 0 0 14px rgba(255,45,247,0.10);
+  }
+  #hud .hint{
+    margin-top:8px;
+    opacity:0.9;
+    color:#bfefff;
+    font-size:12px;
+  }
+
+  #center{
+    position:fixed; left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    text-align:center;
+    pointer-events:none;
+    width:min(760px, 92vw);
+  }
+  #center .title{
+    font-size: 30px;
+    letter-spacing: 0.12em;
+    color: var(--c1);
+    text-shadow:
+      0 0 18px rgba(40,247,255,0.40),
+      0 0 42px rgba(255,45,247,0.22);
+    margin: 0 0 10px 0;
+  }
+  #center .sub{
+    font-size: 14px;
+    color: #d6f2ff;
+    opacity: 0.95;
+    text-shadow: 0 0 14px rgba(40,247,255,0.18);
+    margin: 0 0 14px 0;
+  }
+  #center .kbd{
+    display:inline-block;
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(183,255,60,0.25);
+    background: rgba(183,255,60,0.06);
+    box-shadow: 0 0 18px rgba(183,255,60,0.12);
+    color: #ecffcc;
+  }
+  #center .small{
+    margin-top: 10px;
+    font-size: 12px;
+    opacity: 0.9;
+    color:#cfe9ff;
+  }
+
+  /* CRT-ish overlay */
+  .overlay{
+    position:fixed; inset:0; pointer-events:none;
+    background:
+      linear-gradient(to bottom, rgba(255,255,255,0.035), rgba(0,0,0,0.03)),
+      repeating-linear-gradient(
+        to bottom,
+        rgba(0,0,0,0.0) 0px,
+        rgba(0,0,0,0.0) 2px,
+        rgba(0,0,0,0.08) 3px
+      );
+    mix-blend-mode: overlay;
+    opacity: 0.55;
+  }
+  .vignette{
+    position:fixed; inset:-20px; pointer-events:none;
+    background: radial-gradient(closest-side, rgba(0,0,0,0) 58%, rgba(0,0,0,0.28) 100%);
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="row">
+    <div><b>SCORE</b> <span id="score">00000</span></div>
+    <div class="pill"><span style="color:var(--c3)">LIVES</span> <span id="lives">3</span></div>
+    <div class="pill"><span style="color:var(--c2)">WAVE</span> <span id="wave">1</span></div>
+    <div class="pill"><span style="color:var(--amber)">HI</span> <span id="hi">00000</span></div>
+  </div>
+  <div class="hint">← → move · Space shoot · P pause · M mute · C psychedelia · Enter start</div>
+</div>
+
+<div id="center" style="display:block">
+  <div class="title">NEON INVADERS</div>
+  <div class="sub">Space Invaders, but dipped in cyan/magenta and lightly electrocuted.</div>
+  <div class="kbd">Press <b>Enter</b> to start</div>
+  <div class="small">Tip: If you win, pretend it was skill and not the glow.</div>
+</div>
+
+<div class="overlay"></div>
+<div class="vignette"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  // -----------------------------
+  // Canvas setup (internal res)
+  // -----------------------------
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d", { alpha: false });
+
+  const HUD = {
+    score: document.getElementById("score"),
+    lives: document.getElementById("lives"),
+    wave: document.getElementById("wave"),
+    hi: document.getElementById("hi"),
+    center: document.getElementById("center")
+  };
+
+  const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  let W = 960, H = 540;          // internal resolution (scaled to screen)
+  let scale = 1;
+
+  function resize(){
+    const ww = window.innerWidth, hh = window.innerHeight;
+    // maintain 16:9-ish internal
+    const target = 960/540;
+    let iw = ww, ih = hh;
+    if (iw/ih > target) iw = ih * target;
+    else ih = iw / target;
+
+    scale = Math.floor(Math.min(ww/960, hh/540) * DPR * 2) / 2;
+    scale = Math.max(1, Math.min(3, scale));
+
+    W = 960; H = 540;
+    canvas.width  = Math.floor(W * scale);
+    canvas.height = Math.floor(H * scale);
+    canvas.style.width  = ww + "px";
+    canvas.style.height = hh + "px";
+    ctx.imageSmoothingEnabled = false;
+  }
+  window.addEventListener("resize", resize, { passive:true });
+  resize();
+
+  // -----------------------------
+  // Neon palette + helpers
+  // -----------------------------
+  const PAL = {
+    bg0: "#05060a",
+    c1: "#28f7ff",
+    c2: "#ff2df7",
+    c3: "#b7ff3c",
+    danger: "#ff3b3b",
+    amber: "#ffcc66",
+    text: "#cfe9ff"
+  };
+
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function lerp(a,b,t){ return a + (b-a)*t; }
+  function rnd(a=1,b=0){ return b + Math.random()*(a-b); }
+  function irnd(a,b){ return Math.floor(rnd(a+1,b)); }
+
+  function neonStroke(color, w=2, glow=16, alpha=1){
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = w;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = glow;
+  }
+  function neonFill(color, glow=18, alpha=1){
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = glow;
+  }
+
+  // -----------------------------
+  // Psychedelia (NEW)
+  // -----------------------------
+  function psychoColor(base=0){
+    const h = (state.paletteShift + base) % (Math.PI * 2);
+    const r = Math.floor(128 + Math.sin(h) * 127);
+    const g = Math.floor(128 + Math.sin(h + 2) * 127);
+    const b = Math.floor(128 + Math.sin(h + 4) * 127);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function drawCopperBars(){
+    if (!state.psychedelia) return;
+    const barH = 62;
+    const t = state.t * 2.1;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    // top bars
+    for (let y=0; y<barH; y++){
+      const wob = Math.sin(t + y*0.12) * 0.55;
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = psychoColor(wob);
+      ctx.fillRect(0, y, W, 1);
+      if ((y % 6) === 0){
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = psychoColor(wob + 1.3);
+        ctx.fillRect(0, y, W, 2);
+      }
+    }
+
+    // bottom bars
+    for (let y=0; y<barH; y++){
+      const wob = Math.sin(t + y*0.15 + 3.2) * 0.55;
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = psychoColor(wob + 2.1);
+      ctx.fillRect(0, H - barH + y, W, 1);
+      if ((y % 7) === 0){
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = psychoColor(wob + 0.4);
+        ctx.fillRect(0, H - barH + y, W, 2);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // -----------------------------
+  // Audio (tiny synth beeps)
+  // -----------------------------
+  let audioCtx = null;
+  let muted = false;
+
+  function ensureAudio(){
+    if (!audioCtx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    }
+  }
+  function beep(freq=440, dur=0.06, type="square", gain=0.05){
+    if (muted) return;
+    ensureAudio();
+    if (!audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(gain, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t0); o.stop(t0 + dur);
+  }
+  function thump(){
+    if (muted) return;
+    ensureAudio();
+    if (!audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(110, t0);
+    o.frequency.exponentialRampToValueAtTime(55, t0+0.12);
+    g.gain.setValueAtTime(0.06, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+0.18);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t0); o.stop(t0+0.2);
+  }
+
+  // -----------------------------
+  // Input
+  // -----------------------------
+  const keys = new Set();
+  window.addEventListener("keydown", (e)=>{
+    const k = e.key.toLowerCase();
+    keys.add(k);
+    if (["arrowleft","arrowright"," ","p","m","enter","c"].includes(k)) e.preventDefault();
+
+    if (k === "m"){
+      muted = !muted;
+      beep(muted ? 220 : 660, 0.07, "square", 0.05);
+    }
+    if (k === "p" && state.mode === "play"){
+      state.paused = !state.paused;
+      beep(state.paused ? 260 : 520, 0.06, "square", 0.05);
+    }
+    if (k === "c" && (state.mode === "play" || state.mode === "title" || state.mode === "gameover")){
+      state.psychedelia = !state.psychedelia;
+      // tiny “mode flip” chirp
+      beep(state.psychedelia ? 920 : 420, 0.06, "square", 0.05);
+    }
+    if (k === "enter" && (state.mode === "title" || state.mode === "gameover")){
+      startGame();
+    }
+  }, { passive:false });
+
+  window.addEventListener("keyup", (e)=>{
+    keys.delete(e.key.toLowerCase());
+  }, { passive:true });
+
+  // -----------------------------
+  // Game state
+  // -----------------------------
+  const state = {
+    mode: "title",       // title | play | gameover
+    paused: false,
+
+    score: 0,
+    hi: 0,
+    wave: 1,
+    lives: 3,
+
+    // timing
+    t: 0,
+    dt: 0,
+    last: performance.now(),
+
+    // invader beat
+    beatT: 0,
+    beatInterval: 0.62, // seconds (shrinks as invaders die)
+    beatFlip: 0,
+
+    // misc
+    flash: 0,
+    shake: 0,
+
+    // ufo
+    ufo: null,
+
+    // stars
+    stars: [],
+
+    // Psychedelia (NEW)
+    psychedelia: false,
+    paletteShift: 0
+  };
+
+  // Entities
+  const player = {
+    x: W*0.5, y: H-52,
+    w: 26, h: 14,
+    vx: 0,
+    cooldown: 0,
+    alive: true
+  };
+
+  let invaders = [];
+  let bullets = [];       // player bullets
+  let ebullets = [];      // enemy bullets
+  let shields = [];       // 4 shields, destructible blocks
+  let particles = [];
+
+  // -----------------------------
+  // Starfield
+  // -----------------------------
+  function initStars(){
+    state.stars.length = 0;
+    const n = 220;
+    for (let i=0;i<n;i++){
+      state.stars.push({
+        x: Math.random()*W,
+        y: Math.random()*H,
+        z: rnd(1,0),
+        s: rnd(2.2,0.6),
+        sp: rnd(56,12)
+      });
+    }
+  }
+  initStars();
+
+  function updateStars(dt){
+    for (const st of state.stars){
+      st.y += dt * st.sp * (0.35 + st.z*1.15);
+      st.x += dt * (Math.sin((state.t*0.9 + st.y*0.01)) * 6) * (0.2+st.z);
+      if (st.y > H+4){ st.y = -4; st.x = Math.random()*W; }
+      if (st.x < -6) st.x = W+6;
+      if (st.x > W+6) st.x = -6;
+    }
+  }
+
+  function drawStars(){
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const st of state.stars){
+      const a = 0.10 + st.z*0.22;
+
+      // base neon (unchanged) — but with optional mild psycho tint
+      const base = (Math.floor(st.y*0.08) % 2 === 0) ? PAL.c1 : PAL.c2;
+      const c = state.psychedelia ? psychoColor(st.z*1.2 + (base===PAL.c1?0.4:1.6)) : base;
+
+      neonFill(c, 10 + st.z*12, a);
+      ctx.fillRect(st.x, st.y, st.s, st.s);
+    }
+    ctx.restore();
+  }
+
+  // -----------------------------
+  // Shields (block grid)
+  // -----------------------------
+  function makeShield(x, y){
+    // 12x8 blocks; cutouts like classic
+    const cols = 12, rows = 8;
+    const cell = 6;
+    const grid = [];
+    for (let r=0;r<rows;r++){
+      for (let c=0;c<cols;c++){
+        let solid = true;
+        // carve top corners + bottom center
+        if (r === 0 && (c<2 || c>cols-3)) solid = false;
+        if (r === 1 && (c===0 || c===cols-1)) solid = false;
+        if (r >= 5 && (c>=4 && c<=7) && r>=6) solid = false;
+        // round-ish edges
+        if ((r===7) && (c<1 || c>cols-2)) solid = false;
+        grid.push(solid ? 3 : 0); // "hp" per block
+      }
+    }
+    return { x, y, cols, rows, cell, grid };
+  }
+
+  function initShields(){
+    shields.length = 0;
+    const y = H - 140;
+    const gap = W / 5;
+    for (let i=1;i<=4;i++){
+      shields.push(makeShield(Math.floor(gap*i - 36), y));
+    }
+  }
+
+  function shieldHit(px, py, radius=2){
+    for (const sh of shields){
+      const {x,y,cols,rows,cell,grid} = sh;
+      const lx = px - x, ly = py - y;
+      if (lx < -radius || ly < -radius || lx > cols*cell+radius || ly > rows*cell+radius) continue;
+      const c0 = clamp(Math.floor(lx/cell), 0, cols-1);
+      const r0 = clamp(Math.floor(ly/cell), 0, rows-1);
+      const idx = r0*cols + c0;
+      if (grid[idx] > 0){
+        grid[idx] = Math.max(0, grid[idx]-1);
+        // chip a little neighborhood for spicy craters
+        for (let rr=r0-1; rr<=r0+1; rr++){
+          for (let cc=c0-1; cc<=c0+1; cc++){
+            if (rr<0||cc<0||rr>=rows||cc>=cols) continue;
+            const j = rr*cols+cc;
+            if (grid[j] > 0 && Math.random()<0.25) grid[j] = Math.max(0, grid[j]-1);
+          }
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function drawShields(){
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const sh of shields){
+      const {x,y,cols,rows,cell,grid} = sh;
+      for (let r=0;r<rows;r++){
+        for (let c=0;c<cols;c++){
+          const hp = grid[r*cols+c];
+          if (!hp) continue;
+          const px = x + c*cell;
+          const py = y + r*cell;
+          const mix = hp/3;
+
+          // original colour selection preserved; optional psycho tint (subtle)
+          const base = mix > 0.66 ? PAL.c3 : (mix > 0.33 ? PAL.c1 : PAL.c2);
+          const col = state.psychedelia ? psychoColor(mix*1.7 + (base===PAL.c3?2.2:base===PAL.c1?0.7:1.4)) : base;
+
+          neonFill(col, 14, 0.35 + mix*0.35);
+          ctx.fillRect(px, py, cell, cell);
+        }
+      }
+      // outline
+      neonStroke(PAL.c1, 1, 12, 0.25);
+      ctx.strokeRect(x-1, y-1, cols*cell+2, rows*cell+2);
+    }
+    ctx.restore();
+  }
+
+  // -----------------------------
+  // Invaders
+  // -----------------------------
+  function invaderSprite(type, frame, x, y, s){
+    // simple vector-ish pixel blocks (no images)
+    const b = (xx,yy,w,h)=>ctx.fillRect(x+xx*s, y+yy*s, w*s, h*s);
+    const a = (xx,yy)=>ctx.fillRect(x+xx*s, y+yy*s, s, s);
+
+    // two-frame wiggle
+    const wig = frame ? 0 : 1;
+
+    if (type === 0){ // squid-ish (top row)
+      // body
+      b(3,0,6,1); b(2,1,8,1); b(1,2,10,1); b(0,3,12,2);
+      b(1,5,10,2); b(2,7,2,1); b(8,7,2,1);
+      // legs
+      if (wig){
+        b(2,8,2,1); b(8,8,2,1);
+        a(1,9); a(10,9);
+      } else {
+        a(0,8); a(11,8);
+        b(4,9,4,1);
+      }
+    } else if (type === 1){ // crab-ish
+      b(2,0,8,1); b(1,1,10,1); b(0,2,12,2); b(1,4,10,2);
+      // eyes
+      a(3,2); a(8,2);
+      // claws
+      if (wig){
+        b(0,5,2,1); b(10,5,2,1);
+        b(1,6,2,1); b(9,6,2,1);
+        b(3,7,6,1);
+      } else {
+        b(0,6,3,1); b(9,6,3,1);
+        b(2,7,2,1); b(8,7,2,1);
+        b(4,8,4,1);
+      }
+    } else { // type 2: octo-ish (bottom rows)
+      b(2,0,8,1); b(1,1,10,1); b(0,2,12,2); b(1,4,10,2);
+      a(3,3); a(8,3);
+      if (wig){
+        b(2,6,2,2); b(8,6,2,2);
+        b(4,7,4,1);
+      } else {
+        b(1,6,2,2); b(9,6,2,2);
+        b(4,6,4,1);
+      }
+      b(0,8,2,1); b(10,8,2,1);
+    }
+  }
+
+  function initInvaders(wave){
+    invaders.length = 0;
+    const rows = 5;
+    const cols = 11;
+    const startX = 110;
+    const startY = 90;
+    const gapX = 56;
+    const gapY = 42;
+
+    for (let r=0;r<rows;r++){
+      for (let c=0;c<cols;c++){
+        const type = (r===0) ? 0 : (r<=2 ? 1 : 2);
+        invaders.push({
+          x: startX + c*gapX,
+          y: startY + r*gapY,
+          w: 12*3,
+          h: 10*3,
+          type,
+          alive: true
+        });
+      }
+    }
+
+    // movement pack
+    pack.dir = 1;
+    pack.speed = 18 + (wave-1)*2.0;
+    pack.drop = 18;
+    pack.baseY = startY;
+    pack.offsetX = 0;
+    pack.offsetY = 0;
+
+    // beat speed baseline
+    state.beatInterval = Math.max(0.18, 0.62 - (wave-1)*0.04);
+    state.beatT = 0;
+    state.beatFlip = 0;
+  }
+
+  const pack = {
+    dir: 1,
+    speed: 18,
+    drop: 18,
+    offsetX: 0,
+    offsetY: 0
+  };
+
+  function aliveInvaders(){
+    let n=0;
+    for (const i of invaders) if (i.alive) n++;
+    return n;
+  }
+
+  function invaderBounds(){
+    let minX=1e9, maxX=-1e9, minY=1e9, maxY=-1e9;
+    for (const i of invaders){
+      if (!i.alive) continue;
+      const x = i.x + pack.offsetX, y = i.y + pack.offsetY;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x + i.w);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y + i.h);
+    }
+    if (minX===1e9) return null;
+    return {minX,maxX,minY,maxY};
+  }
+
+  function updateInvaders(dt){
+    // beat timing (classic thump step)
+    state.beatT += dt;
+
+    const alive = aliveInvaders();
+    const tight = clamp(1 - alive/55, 0, 1);
+    const interval = Math.max(0.08, state.beatInterval * (1 - tight*0.72));
+
+    if (state.beatT >= interval){
+      state.beatT = 0;
+      state.beatFlip ^= 1;
+
+      // Psychedelia: shift palette ON THE BEAT (NEW)
+      if (state.psychedelia){
+        state.paletteShift = (state.paletteShift + 0.18) % (Math.PI * 2);
+      }
+
+      // step move per beat (classic)
+      const step = (10 + tight*20) + (state.wave-1)*1.0;
+      pack.offsetX += pack.dir * step;
+
+      // wall check
+      const b = invaderBounds();
+      if (b){
+        if (b.minX < 54 || b.maxX > W-54){
+          // bounce + drop
+          pack.dir *= -1;
+          pack.offsetX += pack.dir * step;
+          pack.offsetY += pack.drop;
+          // beefy thump
+          beep(120 + tight*120, 0.06, "square", 0.05);
+        } else {
+          // regular thump
+          beep(90 + tight*220, 0.03, "square", 0.035);
+        }
+
+        // lose if reach player line
+        if (b.maxY > player.y - 18){
+          state.lives = 0;
+          gameOver();
+        }
+      }
+    }
+
+    // enemy shooting (calm but still arcade)
+    // chance scales with wave and invaders remaining
+    const shootRate = (0.45 + state.wave*0.10) * (0.45 + tight*1.1); // bullets/sec
+    if (Math.random() < dt * shootRate){
+      enemyShoot();
+    }
+  }
+
+  function enemyShoot(){
+    // choose a random column; shoot from lowest alive in that column
+    const cols = 11;
+    const col = irnd(cols-1,0);
+    let shooter = null;
+    for (let r=4;r>=0;r--){
+      const idx = r*cols + col;
+      const inv = invaders[idx];
+      if (inv && inv.alive){ shooter = inv; break; }
+    }
+    if (!shooter) return;
+
+    const x = shooter.x + pack.offsetX + shooter.w*0.5;
+    const y = shooter.y + pack.offsetY + shooter.h + 2;
+
+    ebullets.push({
+      x, y,
+      vx: rnd(26,-26) * 0.06, // subtle drift
+      vy: 160 + state.wave*18 + rnd(30,-30),
+      r: 3,
+      life: 4
+    });
+    beep(220 + rnd(40,-40), 0.03, "square", 0.03);
+  }
+
+  function drawInvaders(){
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    const tight = clamp(1 - aliveInvaders()/55, 0, 1);
+
+    for (const i of invaders){
+      if (!i.alive) continue;
+      const x = Math.floor(i.x + pack.offsetX);
+      const y = Math.floor(i.y + pack.offsetY);
+
+      // original base colour mapping preserved, with optional psycho override
+      let col = (i.type === 0) ? PAL.c1 : (i.type === 1) ? PAL.c2 : PAL.c3;
+      if (state.psychedelia){
+        col = psychoColor(i.type * 1.35);
+      }
+
+      const glow = 18 + tight*20;
+
+      // glow pass
+      neonFill(col, glow, 0.22);
+      ctx.fillRect(x-2, y-2, i.w+4, i.h+4);
+
+      // sprite
+      neonFill(col, 10 + tight*12, 0.95);
+      invaderSprite(i.type, state.beatFlip, x, y, 3);
+
+      // thin outline for extra pop
+      neonStroke("#ffffff", 1, 8, 0.08);
+      ctx.strokeRect(x+1, y+1, i.w-2, i.h-2);
+    }
+    ctx.restore();
+  }
+
+  // -----------------------------
+  // UFO
+  // -----------------------------
+  function maybeSpawnUFO(dt){
+    if (state.ufo) return;
+    // spawn occasionally (rarer early)
+    const chance = dt * (0.018 + state.wave*0.003);
+    if (Math.random() < chance){
+      const dir = Math.random()<0.5 ? 1 : -1;
+      state.ufo = {
+        x: dir===1 ? -80 : W+80,
+        y: 56,
+        vx: dir * (110 + state.wave*10),
+        w: 62,
+        h: 18,
+        t: 0,
+        alive: true
+      };
+      beep(880, 0.05, "square", 0.03);
+    }
+  }
+
+  function updateUFO(dt){
+    if (!state.ufo) return;
+    const u = state.ufo;
+    u.t += dt;
+    u.x += u.vx * dt;
+    if (u.x < -120 || u.x > W+120) state.ufo = null;
+  }
+
+  function drawUFO(){
+    if (!state.ufo) return;
+    const u = state.ufo;
+    const wob = Math.sin(u.t*10)*2;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    neonFill(PAL.amber, 28, 0.35);
+    ctx.fillRect(u.x-6, u.y-4, u.w+12, u.h+8);
+    neonFill(PAL.amber, 14, 0.95);
+    // saucer body
+    roundRectFill(u.x, u.y, u.w, u.h, 8);
+    neonStroke(PAL.c2, 2, 18, 0.55);
+    roundRectStroke(u.x+8, u.y+4+wob*0.2, u.w-16, u.h-8, 6);
+    ctx.restore();
+  }
+
+  // -----------------------------
+  // Player
+  // -----------------------------
+  function resetPlayer(){
+    player.x = W*0.5;
+    player.y = H-52;
+    player.cooldown = 0;
+    player.alive = true;
+  }
+
+  function playerShoot(){
+    if (player.cooldown > 0) return;
+    bullets.push({
+      x: player.x,
+      y: player.y - 12,
+      vx: 0,
+      vy: -360,
+      r: 3,
+      life: 2
+    });
+    player.cooldown = 0.22; // classic-ish single-shot feel
+    beep(740, 0.04, "square", 0.05);
+  }
+
+  function updatePlayer(dt){
+    if (!player.alive) return;
+
+    const left  = keys.has("arrowleft") || keys.has("a");
+    const right = keys.has("arrowright") || keys.has("d");
+    const shoot = keys.has(" ");
+
+    const sp = 240;
+    player.vx = (right?1:0) - (left?1:0);
+    player.x += player.vx * sp * dt;
+    player.x = clamp(player.x, 40, W-40);
+
+    player.cooldown = Math.max(0, player.cooldown - dt);
+    if (shoot) playerShoot();
+  }
+
+  function drawPlayer(){
+    const x = player.x, y = player.y;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    // glow base
+    neonFill(PAL.c1, 26, 0.20);
+    ctx.fillRect(x-22, y-18, 44, 26);
+
+    // ship body (simple vector)
+    neonFill(PAL.c1, 14, 0.95);
+    roundRectFill(x-18, y-10, 36, 14, 6);
+    neonFill(PAL.c2, 16, 0.9);
+    roundRectFill(x-6, y-18, 12, 10, 5);
+
+    // cannon tip
+    neonFill(PAL.c3, 14, 0.9);
+    ctx.fillRect(x-2, y-22, 4, 8);
+
+    // outline
+    neonStroke("#ffffff", 1, 10, 0.09);
+    roundRectStroke(x-18, y-10, 36, 14, 6);
+
+    ctx.restore();
+  }
+
+  // -----------------------------
+  // Bullets + collisions
+  // -----------------------------
+  function updateBullets(dt){
+    // player bullets
+    for (let i=bullets.length-1;i>=0;i--){
+      const b = bullets[i];
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.life -= dt;
+
+      // shield collision
+      if (shieldHit(b.x, b.y, 2)){
+        bullets.splice(i,1);
+        spark(b.x,b.y, PAL.c3, 8);
+        beep(330, 0.02, "square", 0.03);
+        continue;
+      }
+
+      // invader collision
+      let hit = false;
+      for (const inv of invaders){
+        if (!inv.alive) continue;
+        const ix = inv.x + pack.offsetX, iy = inv.y + pack.offsetY;
+        if (b.x > ix && b.x < ix+inv.w && b.y > iy && b.y < iy+inv.h){
+          inv.alive = false;
+          bullets.splice(i,1);
+          hit = true;
+          const pts = inv.type===0 ? 30 : (inv.type===1 ? 20 : 10);
+          addScore(pts);
+          state.flash = 0.25;
+          state.shake = Math.max(state.shake, 0.12);
+          spark(b.x,b.y, inv.type===0?PAL.c1:inv.type===1?PAL.c2:PAL.c3, 16);
+          thump();
+          break;
+        }
+      }
+      if (hit) continue;
+
+      // UFO collision
+      if (state.ufo){
+        const u = state.ufo;
+        if (b.x > u.x && b.x < u.x+u.w && b.y > u.y && b.y < u.y+u.h){
+          bullets.splice(i,1);
+          const pts = [50,100,150,300][irnd(3,0)];
+          addScore(pts);
+          spark(b.x,b.y, PAL.amber, 28);
+          state.ufo = null;
+          state.flash = 0.35;
+          state.shake = Math.max(state.shake, 0.16);
+          beep(980, 0.06, "square", 0.06);
+          continue;
+        }
+      }
+
+      if (b.y < -20 || b.life <= 0) bullets.splice(i,1);
+    }
+
+    // enemy bullets
+    for (let i=ebullets.length-1;i>=0;i--){
+      const b = ebullets[i];
+      b.x += b.vx * b.vy * dt;
+      b.y += b.vy * dt;
+      b.life -= dt;
+
+      // shield collision
+      if (shieldHit(b.x, b.y, 3)){
+        ebullets.splice(i,1);
+        spark(b.x,b.y, PAL.c2, 10);
+        beep(240, 0.02, "square", 0.03);
+        continue;
+      }
+
+      // player collision
+      if (player.alive){
+        const px = player.x, py = player.y;
+        if (b.x > px-18 && b.x < px+18 && b.y > py-22 && b.y < py+10){
+          ebullets.splice(i,1);
+          playerDie();
+          continue;
+        }
+      }
+
+      if (b.y > H+30 || b.life <= 0) ebullets.splice(i,1);
+    }
+  }
+
+  function drawBullets(){
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    for (const b of bullets){
+      neonFill(PAL.c3, 16, 0.95);
+      ctx.fillRect(b.x-1.5, b.y-10, 3, 10);
+      neonFill(PAL.c1, 20, 0.22);
+      ctx.fillRect(b.x-4, b.y-12, 8, 14);
+    }
+    for (const b of ebullets){
+      neonFill(PAL.c2, 18, 0.9);
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 3.2, 0, Math.PI*2);
+      ctx.fill();
+      neonFill(PAL.c2, 24, 0.18);
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 8.5, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  // -----------------------------
+  // Particles
+  // -----------------------------
+  function spark(x,y,color, n=12){
+    for (let i=0;i<n;i++){
+      const a = Math.random()*Math.PI*2;
+      const sp = rnd(220,60);
+      particles.push({
+        x,y,
+        vx: Math.cos(a)*sp,
+        vy: Math.sin(a)*sp,
+        life: rnd(0.55,0.25),
+        r: rnd(3.2,1.2),
+        col: color
+      });
+    }
+  }
+
+  function updateParticles(dt){
+    for (let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.life -= dt;
+      p.x += p.vx*dt;
+      p.y += p.vy*dt;
+      p.vx *= Math.pow(0.04, dt); // strong damping
+      p.vy *= Math.pow(0.04, dt);
+      p.vy += 60*dt; // tiny gravity
+      if (p.life <= 0) particles.splice(i,1);
+    }
+  }
+
+  function drawParticles(){
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const p of particles){
+      const a = clamp(p.life/0.55, 0, 1);
+      neonFill(p.col, 18, 0.22*a);
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r*3, 0, Math.PI*2); ctx.fill();
+      neonFill(p.col, 10, 0.85*a);
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // -----------------------------
+  // Utility rounded rect
+  // -----------------------------
+  function roundRectPath(x,y,w,h,r){
+    r = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+  function roundRectFill(x,y,w,h,r){
+    roundRectPath(x,y,w,h,r); ctx.fill();
+  }
+  function roundRectStroke(x,y,w,h,r){
+    roundRectPath(x,y,w,h,r); ctx.stroke();
+  }
+
+  // -----------------------------
+  // Score / UI
+  // -----------------------------
+  function fmt(n){
+    n = Math.max(0, Math.floor(n));
+    return String(n).padStart(5,"0");
+  }
+  function addScore(pts){
+    state.score += pts;
+    state.hi = Math.max(state.hi, state.score);
+    HUD.score.textContent = fmt(state.score);
+    HUD.hi.textContent = fmt(state.hi);
+  }
+  function syncHUD(){
+    HUD.score.textContent = fmt(state.score);
+    HUD.hi.textContent = fmt(state.hi);
+    HUD.lives.textContent = String(state.lives);
+    HUD.wave.textContent = String(state.wave);
+  }
+
+  // -----------------------------
+  // Game flow
+  // -----------------------------
+  function startGame(){
+    state.mode = "play";
+    state.paused = false;
+    state.score = 0;
+    state.wave = 1;
+    state.lives = 3;
+    state.flash = 0;
+    state.shake = 0;
+    state.ufo = null;
+
+    bullets.length = 0;
+    ebullets.length = 0;
+    particles.length = 0;
+
+    initShields();
+    initInvaders(state.wave);
+    resetPlayer();
+
+    HUD.center.style.display = "none";
+    syncHUD();
+    beep(660, 0.06, "square", 0.05);
+  }
+
+  function nextWave(){
+    state.wave += 1;
+    bullets.length = 0;
+    ebullets.length = 0;
+    particles.length = 0;
+    state.ufo = null;
+
+    // small repair to shields each wave (neon fairness)
+    for (const sh of shields){
+      for (let i=0;i<sh.grid.length;i++){
+        if (sh.grid[i] > 0 && sh.grid[i] < 3 && Math.random()<0.35) sh.grid[i] += 1;
+      }
+    }
+
+    initInvaders(state.wave);
+    resetPlayer();
+    syncHUD();
+
+    state.flash = 0.35;
+    state.shake = Math.max(state.shake, 0.16);
+    beep(880, 0.08, "square", 0.06);
+  }
+
+  function playerDie(){
+    if (!player.alive) return;
+    player.alive = false;
+    state.lives -= 1;
+    syncHUD();
+
+    state.flash = 0.32;
+    state.shake = Math.max(state.shake, 0.18);
+    spark(player.x, player.y-6, PAL.danger, 28);
+    beep(180, 0.09, "sawtooth", 0.06);
+
+    // respawn
+    setTimeout(()=>{
+      if (state.mode !== "play") return;
+      if (state.lives <= 0){ gameOver(); return; }
+      resetPlayer();
+      player.alive = true;
+      beep(520, 0.05, "square", 0.05);
+    }, 650);
+  }
+
+  function gameOver(){
+    state.mode = "gameover";
+    HUD.center.style.display = "block";
+    HUD.center.innerHTML = `
+      <div class="title" style="color:${PAL.c2}; text-shadow:0 0 18px rgba(255,45,247,0.42), 0 0 40px rgba(40,247,255,0.20);">GAME OVER</div>
+      <div class="sub">Final score: <b style="color:${PAL.c3}; text-shadow:0 0 14px rgba(183,255,60,0.35);">${fmt(state.score)}</b> · High: <b style="color:${PAL.amber};">${fmt(state.hi)}</b></div>
+      <div class="kbd">Press <b>Enter</b> to restart</div>
+      <div class="small">Your ship has been promoted to “modern art”.</div>
+    `;
+    beep(140, 0.12, "square", 0.06);
+  }
+
+  // -----------------------------
+  // Main loop
+  // -----------------------------
+  function update(now){
+    const t = now * 0.001;
+    let dt = (now - state.last) * 0.001;
+    state.last = now;
+
+    dt = clamp(dt, 0, 0.033);
+    state.t = t;
+    state.dt = dt;
+
+    if (state.mode === "title"){
+      // little idle shimmer
+      updateStars(dt);
+      draw();
+      requestAnimationFrame(update);
+      return;
+    }
+
+    if (state.mode === "play" && !state.paused){
+      updateStars(dt);
+      updatePlayer(dt);
+      updateInvaders(dt);
+      maybeSpawnUFO(dt);
+      updateUFO(dt);
+      updateBullets(dt);
+      updateParticles(dt);
+
+      // wave clear
+      if (aliveInvaders() === 0){
+        nextWave();
+      }
+
+      state.flash = Math.max(0, state.flash - dt);
+      state.shake = Math.max(0, state.shake - dt);
+    } else {
+      // paused / gameover still animate stars
+      updateStars(dt*0.6);
+      updateParticles(dt*0.6);
+      state.flash = Math.max(0, state.flash - dt);
+      state.shake = Math.max(0, state.shake - dt);
+    }
+
+    draw();
+    requestAnimationFrame(update);
+  }
+
+  function draw(){
+    // base background
+    ctx.save();
+    ctx.setTransform(scale,0,0,scale,0,0);
+
+    // camera shake
+    const sh = state.shake * 8;
+    const ox = (Math.random()*2-1) * sh;
+    const oy = (Math.random()*2-1) * sh;
+    ctx.translate(ox, oy);
+
+    // dark clear
+    ctx.globalCompositeOperation = "source-over";
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = PAL.bg0;
+    ctx.fillRect(-40,-40, W+80, H+80);
+
+    // subtle nebula gradient bands
+    ctx.globalAlpha = 0.6;
+    const g = ctx.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,"#070a18");
+    g.addColorStop(0.5,"#05060a");
+    g.addColorStop(1,"#020208");
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha = 1;
+
+    drawStars();
+
+    // Psychedelia copper bars (NEW) — drawn after background, before entities
+    drawCopperBars();
+
+    // horizon line (classic)
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    neonStroke(PAL.c1, 2, 18, 0.18);
+    ctx.beginPath();
+    ctx.moveTo(40, H-30);
+    ctx.lineTo(W-40, H-30);
+    ctx.stroke();
+    ctx.restore();
+
+    // entities
+    drawShields();
+    drawInvaders();
+    drawUFO();
+    drawPlayer();
+    drawBullets();
+    drawParticles();
+
+    // flash
+    if (state.flash > 0){
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = state.flash * 0.55;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0,0,W,H);
+      ctx.restore();
+    }
+
+    // chroma smear / neon bloom pass (cheap)
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 0.06;
+    ctx.filter = "blur(6px)";
+    ctx.drawImage(canvas, 0, 0, canvas.width/scale, canvas.height/scale);
+    ctx.filter = "none";
+    ctx.restore();
+
+    // paused label
+    if (state.mode === "play" && state.paused){
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      neonFill(PAL.c2, 22, 0.9);
+      ctx.font = "24px ui-monospace, Menlo, Consolas, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("PAUSED", W/2, H/2);
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  // -----------------------------
+  // Title screen copy
+  // -----------------------------
+  function showTitle(){
+    state.mode = "title";
+    HUD.center.style.display = "block";
+    HUD.center.innerHTML = `
+      <div class="title">NEON INVADERS</div>
+      <div class="sub">Classic formation · Shields · UFO · Waves · Neon glow (obviously).<br/>Press <b>C</b> for Psychedelia Mode.</div>
+      <div class="kbd">Press <b>Enter</b> to start</div>
+      <div class="small">Controls: ← → move · Space shoot · P pause · M mute · C psychedelia</div>
+    `;
+    state.score = 0;
+    state.wave = 1;
+    state.lives = 3;
+    syncHUD();
+  }
+
+  // -----------------------------
+  // Boot
+  // -----------------------------
+  showTitle();
+  requestAnimationFrame(update);
+
+})();
+</script>
+</body>
+</html>
+
