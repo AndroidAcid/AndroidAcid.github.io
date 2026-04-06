@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0a1a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Ghost Detector" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>Ghost Detector</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Roboflow SDK -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.20/lodash.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/async/3.2.0/async.min.js"></script>
+  <script src="https://cdn.roboflow.com/0.2.0/roboflow.js"></script>
+
+  <style>
+    /* ── Reset & tokens ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #050510;
+      --surface:   #0d0d22;
+      --surface2:  #131330;
+      --accent:    #7c3aed;
+      --accent2:   #a855f7;
+      --glow:      rgba(124,58,237,0.55);
+      --ghost:     #b8f7ff;
+      --danger:    #ef4444;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 10px;
+      --shadow-glow: 0 0 40px var(--glow), 0 0 80px rgba(124,58,237,0.2);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Starfield bg ── */
+    #starfield {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124,58,237,0.18) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 80% 80%, rgba(168,85,247,0.08) 0%, transparent 60%),
+        var(--bg);
+    }
+    #starfield canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+    /* ── App shell ── */
+    #app {
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column;
+      height: 100dvh;
+    }
+
+    /* ── Top bar ── */
+    #topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 52px 20px 12px;
+      background: linear-gradient(to bottom, rgba(5,5,16,0.95), transparent);
+      position: relative; z-index: 10;
+    }
+    #topbar .app-title {
+      font-family: 'Creepster', cursive;
+      font-size: 26px; letter-spacing: 1px;
+      color: var(--ghost);
+      text-shadow: 0 0 20px rgba(184,247,255,0.5);
+      display: flex; align-items: center; gap: 8px;
+    }
+    #topbar .app-title span { font-size: 28px; }
+
+    /* ── Counter chip ── */
+    #counter-chip {
+      background: var(--surface2);
+      border: 1px solid rgba(124,58,237,0.4);
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 13px; font-weight: 600;
+      color: var(--accent2);
+      display: flex; align-items: center; gap: 6px;
+      transition: all 0.3s;
+    }
+    #counter-chip.bump {
+      background: rgba(124,58,237,0.25);
+      border-color: var(--accent2);
+      box-shadow: 0 0 14px var(--glow);
+      transform: scale(1.08);
+    }
+    #counter-chip .ghost-icon { font-size: 16px; }
+
+    /* ── Camera view ── */
+    #camera-wrap {
+      flex: 1; position: relative; overflow: hidden;
+      margin: 8px 16px;
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(124,58,237,0.2);
+      box-shadow: var(--shadow-glow), inset 0 0 40px rgba(0,0,0,0.5);
+      background: #000;
+    }
+
+    video, #overlay-canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      border-radius: var(--radius-lg);
+    }
+    #overlay-canvas { pointer-events: none; }
+
+    /* Scan line effect */
+    #camera-wrap::after {
+      content: '';
+      position: absolute; inset: 0; z-index: 5;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px, transparent 3px,
+        rgba(0,0,0,0.05) 3px, rgba(0,0,0,0.05) 4px
+      );
+      border-radius: var(--radius-lg);
+      pointer-events: none;
+    }
+
+    /* Corner brackets */
+    #camera-wrap::before {
+      content: '';
+      position: absolute; inset: 12px; z-index: 6;
+      border-radius: calc(var(--radius-lg) - 8px);
+      pointer-events: none;
+      box-shadow:
+        inset 16px 16px 0 -12px var(--accent),
+        inset -16px 16px 0 -12px var(--accent),
+        inset 16px -16px 0 -12px var(--accent),
+        inset -16px -16px 0 -12px var(--accent);
+      opacity: 0.6;
+    }
+
+    /* ── Loading overlay ── */
+    #loading-overlay {
+      position: absolute; inset: 0; z-index: 20;
+      border-radius: var(--radius-lg);
+      background: rgba(5,5,16,0.88);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 20px;
+      backdrop-filter: blur(4px);
+      transition: opacity 0.6s ease;
+    }
+    #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    .loader-ghost {
+      font-size: 72px;
+      animation: floatBob 2s ease-in-out infinite, pulse-glow 2s ease-in-out infinite;
+      filter: drop-shadow(0 0 20px rgba(184,247,255,0.6));
+    }
+    @keyframes floatBob {
+      0%, 100% { transform: translateY(0) rotate(-3deg); }
+      50%       { transform: translateY(-14px) rotate(3deg); }
+    }
+    @keyframes pulse-glow {
+      0%, 100% { filter: drop-shadow(0 0 12px rgba(184,247,255,0.4)); }
+      50%       { filter: drop-shadow(0 0 30px rgba(184,247,255,0.9)); }
+    }
+
+    .loader-text {
+      font-size: 14px; font-weight: 500; color: var(--ghost);
+      letter-spacing: 2px; text-transform: uppercase;
+    }
+
+    .loader-bar {
+      width: 160px; height: 3px;
+      background: var(--surface2);
+      border-radius: 100px; overflow: hidden;
+    }
+    .loader-bar-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--ghost));
+      border-radius: 100px;
+      animation: loadBar 3s ease-out forwards;
+    }
+    @keyframes loadBar { to { width: 100%; } }
+
+    /* ── Detection flash ── */
+    #detection-flash {
+      position: absolute; inset: 0; z-index: 15;
+      border-radius: var(--radius-lg);
+      background: radial-gradient(ellipse at center, rgba(124,58,237,0.35) 0%, transparent 70%);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.1s;
+    }
+    #detection-flash.active { opacity: 1; }
+
+    /* ── Bottom bar ── */
+    #bottombar {
+      padding: 12px 20px 28px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    /* Stats row */
+    #stats-row {
+      display: flex; gap: 10px;
+    }
+    .stat-card {
+      flex: 1; background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .stat-label { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+    .stat-value { font-size: 22px; font-weight: 600; color: var(--text); }
+    .stat-value.accent { color: var(--accent2); }
+    .stat-sub { font-size: 10px; color: var(--muted); }
+
+    /* EMF bar */
+    #emf-bar-wrap {
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .emf-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap; }
+    .emf-segments {
+      flex: 1; display: flex; gap: 3px; align-items: center;
+    }
+    .emf-seg {
+      flex: 1; height: 18px; border-radius: 3px;
+      background: var(--surface2);
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .emf-seg.on {
+      background: var(--accent2);
+      box-shadow: 0 0 6px rgba(168,85,247,0.7);
+    }
+    .emf-seg.on.danger { background: var(--danger); box-shadow: 0 0 8px rgba(239,68,68,0.8); }
+
+    /* ── Scan button ── */
+    #scan-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      border: none; border-radius: var(--radius-md);
+      font-family: 'Inter', sans-serif;
+      font-size: 15px; font-weight: 600;
+      color: white; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 4px 24px rgba(124,58,237,0.45);
+      transition: transform 0.15s, box-shadow 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #scan-btn:active { transform: scale(0.97); box-shadow: 0 2px 12px rgba(124,58,237,0.3); }
+    #scan-btn .btn-icon { font-size: 18px; }
+
+    /* ── Ghost detected toast ── */
+    #toast {
+      position: fixed; top: 100px; left: 50%; transform: translateX(-50%) translateY(-20px);
+      z-index: 100; pointer-events: none;
+      background: linear-gradient(135deg, rgba(124,58,237,0.95), rgba(168,85,247,0.95));
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: var(--radius-md);
+      padding: 12px 24px;
+      font-size: 14px; font-weight: 600;
+      color: white; white-space: nowrap;
+      display: flex; align-items: center; gap: 8px;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      box-shadow: 0 8px 32px rgba(124,58,237,0.5);
+    }
+    #toast.show {
+      opacity: 1; transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Permission screen ── */
+    #permission-screen {
+      position: fixed; inset: 0; z-index: 200;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 24px;
+      padding: 32px; text-align: center;
+    }
+    #permission-screen.hidden { display: none; }
+    #permission-screen .big-ghost { font-size: 80px; animation: floatBob 3s ease-in-out infinite; }
+    #permission-screen h2 { font-family: 'Creepster', cursive; font-size: 32px; color: var(--ghost); text-shadow: 0 0 20px rgba(184,247,255,0.5); }
+    #permission-screen p { font-size: 14px; color: var(--muted); line-height: 1.6; max-width: 280px; }
+    #grant-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: var(--radius-md);
+      padding: 14px 32px; font-family: 'Inter', sans-serif;
+      font-size: 15px; font-weight: 600; color: white; cursor: pointer;
+      box-shadow: 0 4px 24px rgba(124,58,237,0.5);
+      transition: transform 0.15s;
+    }
+    #grant-btn:active { transform: scale(0.97); }
+
+    /* ── FPS badge ── */
+    #fps-badge {
+      position: absolute; bottom: 12px; right: 14px; z-index: 8;
+      font-size: 10px; font-weight: 500; color: var(--muted);
+      background: rgba(0,0,0,0.5); border-radius: 6px;
+      padding: 3px 7px; letter-spacing: 0.5px;
+    }
+    #fps-badge:empty { display: none; }
+
+    /* ── Ripple on ghost detect ── */
+    .ripple {
+      position: absolute; border-radius: 50%;
+      border: 2px solid var(--accent2);
+      animation: rippleOut 1s ease-out forwards;
+      pointer-events: none; z-index: 12;
+    }
+    @keyframes rippleOut {
+      from { opacity: 1; transform: scale(0); }
+      to   { opacity: 0; transform: scale(3); }
+    }
+
+    /* ── Scanning animation line ── */
+    #scan-line {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent2), var(--ghost), var(--accent2), transparent);
+      z-index: 7; opacity: 0;
+      pointer-events: none;
+      box-shadow: 0 0 10px var(--accent2);
+    }
+    #scan-line.scanning {
+      opacity: 1;
+      animation: scanDown 2.5s ease-in-out infinite;
+    }
+    @keyframes scanDown {
+      0%   { top: 0%; }
+      100% { top: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Starfield -->
+<div id="starfield"><canvas id="stars-canvas"></canvas></div>
+
+<!-- Permission screen -->
+<div id="permission-screen">
+  <div class="big-ghost">👻</div>
+  <h2>Ghost Detector</h2>
+  <p>This app uses your camera to detect paranormal activity in your surroundings. Camera access is required.</p>
+  <button id="grant-btn" onclick="startApp()">Allow Camera Access</button>
+</div>
+
+<!-- App -->
+<div id="app">
+  <!-- Top bar -->
+  <div id="topbar">
+    <div class="app-title"><span>👻</span> Ghost Detector</div>
+    <div id="counter-chip">
+      <span class="ghost-icon">🌀</span>
+      <span id="counter-val">0</span> detected
+    </div>
+  </div>
+
+  <!-- Camera -->
+  <div id="camera-wrap">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="overlay-canvas"></canvas>
+    <div id="scan-line"></div>
+    <div id="detection-flash"></div>
+    <div id="fps-badge"></div>
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay">
+      <div class="loader-ghost">👻</div>
+      <div class="loader-text">Calibrating Sensors</div>
+      <div class="loader-bar"><div class="loader-bar-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- Bottom -->
+  <div id="bottombar">
+    <div id="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Ghosts Found</div>
+        <div class="stat-value accent" id="stat-count">0</div>
+        <div class="stat-sub">this session</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Unique Types</div>
+        <div class="stat-value" id="stat-unique">0</div>
+        <div class="stat-sub">classifications</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">EMF Level</div>
+        <div class="stat-value" id="stat-emf">—</div>
+        <div class="stat-sub">paranormal units</div>
+      </div>
+    </div>
+
+    <div id="emf-bar-wrap">
+      <div class="emf-label">EMF</div>
+      <div class="emf-segments" id="emf-segs"></div>
+    </div>
+
+    <button id="scan-btn" onclick="toggleScan()">
+      <span class="btn-icon" id="scan-icon">🔍</span>
+      <span id="scan-label">Begin Scan</span>
+    </button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast">👻 <span id="toast-msg">Ghost detected!</span></div>
+
+<script>
+/* ── Stars ── */
+(function() {
+  const canvas = document.getElementById('stars-canvas');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    stars = Array.from({length: 80}, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.2 + 0.2,
+      a: Math.random(),
+      speed: Math.random() * 0.005 + 0.002
+    }));
+  }
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    stars.forEach(s => {
+      s.a += s.speed;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(200,200,255,${0.3 + 0.5 * Math.abs(Math.sin(s.a))})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize', resize);
+  resize(); draw();
+})();
+
+/* ── EMF segments ── */
+const EMF_COUNT = 12;
+const emfContainer = document.getElementById('emf-segs');
+for(let i=0; i<EMF_COUNT; i++) {
+  const seg = document.createElement('div');
+  seg.className = 'emf-seg';
+  emfContainer.appendChild(seg);
+}
+function setEMF(level /* 0..1 */) {
+  const segs = emfContainer.querySelectorAll('.emf-seg');
+  const lit = Math.round(level * EMF_COUNT);
+  segs.forEach((s,i) => {
+    if(i < lit) {
+      s.classList.add('on');
+      s.classList.toggle('danger', i >= EMF_COUNT * 0.75);
+    } else {
+      s.classList.remove('on','danger');
+    }
+  });
+  document.getElementById('stat-emf').textContent = Math.round(level * 100);
+}
+// Idle EMF flicker
+let emfBase = 0.1;
+setInterval(() => {
+  emfBase = 0.05 + Math.random() * 0.12;
+  setEMF(emfBase + Math.random()*0.05);
+}, 400);
+
+/* ── Toast ── */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* ── Ripple on bounding box centre ── */
+function spawnRipple(x, y) {
+  const wrap = document.getElementById('camera-wrap');
+  const r = document.createElement('div');
+  r.className = 'ripple';
+  r.style.width = r.style.height = '60px';
+  r.style.left = (x - 30) + 'px';
+  r.style.top = (y - 30) + 'px';
+  wrap.appendChild(r);
+  setTimeout(() => r.remove(), 1000);
+}
+
+/* ── Main app ── */
+let scanning = false, model, counter = 0, uniqueClasses = new Set();
+const seen = new Set();
+let prevTime, pastFrameTimes = [];
+
+// Speed controls — slow and deliberate, like a real ghost hunt
+const DETECT_INTERVAL_MS = 1800;  // run ML inference every 1.8 s (not every frame)
+const GHOST_COOLDOWN_MS  = 8000;  // at least 8 s between ghost events
+const SEEN_CLEAR_MS      = 12000; // how long a class is suppressed
+let lastDetectTime  = 0;
+let lastGhostTime   = 0;
+
+function toggleScan() {
+  if(!model) return;
+  scanning = !scanning;
+  document.getElementById('scan-label').textContent = scanning ? 'Stop Scanning' : 'Begin Scan';
+  document.getElementById('scan-icon').textContent  = scanning ? '⏹' : '🔍';
+  document.getElementById('scan-line').className    = scanning ? 'scanning' : '';
+}
+
+function startApp() {
+  document.getElementById('permission-screen').classList.add('hidden');
+  init();
+}
+
+function init() {
+  const video = document.getElementById('video');
+
+  const camPromise = navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: { facingMode: 'environment' }
+  }).then(stream => new Promise(resolve => {
+    video.srcObject = stream;
+    video.onloadeddata = () => { video.play(); resolve(); };
+  }));
+
+  const modelPromise = new Promise((resolve) => {
+    roboflow.auth({ publishable_key: "rf_DH6zabhN9DNqv5ZlrFtEkAPy9g42" })
+      .load({ model: "microsoft-coco", version: 2 })
+      .then(m => { model = m; resolve(); });
+  });
+
+  Promise.all([camPromise, modelPromise]).then(() => {
+    document.getElementById('loading-overlay').classList.add('hidden');
+    setupCanvas();
+    detectLoop();
+  });
+
+  window.addEventListener('resize', setupCanvas);
+}
+
+let canvas, ctx;
+function setupCanvas() {
+  const video  = document.getElementById('video');
+  const cv     = document.getElementById('overlay-canvas');
+  cv.width     = video.videoWidth  || video.offsetWidth;
+  cv.height    = video.videoHeight || video.offsetHeight;
+  canvas = cv; ctx = cv.getContext('2d');
+}
+
+function randomInt(lo, hi) { return Math.floor(Math.random()*(hi-lo+1)+lo); }
+
+function renderPredictions(predictions) {
+  if(!ctx) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!scanning || predictions.length < 2) return;
+
+  // Enforce cooldown between ghost events — deliberate, suspenseful pacing
+  const now = Date.now();
+  if(now - lastGhostTime < GHOST_COOLDOWN_MS) return;
+
+  // Ghost-hunt jitter
+  const xRand = randomInt(60, 110), yRand = randomInt(60, 110);
+  let flag = false, pred = null;
+
+  while(!flag && predictions.length > 1) {
+    pred = predictions.pop();
+    if(pred.confidence < 0.17 && !seen.has(pred.class)) {
+      flag = true;
+      seen.add(pred.class);
+      uniqueClasses.add(pred.class);
+      setTimeout(() => seen.clear(), SEEN_CLEAR_MS);
+    }
+  }
+
+  if(!flag || !pred) return;
+  lastGhostTime = now;
+
+  const x = pred.bbox.x < 300 ? pred.bbox.x : pred.bbox.x + xRand;
+  const y = pred.bbox.y < 300 ? pred.bbox.y : pred.bbox.y + yRand;
+  const w = pred.bbox.width, h = pred.bbox.height;
+
+  // Glowing box
+  ctx.save();
+  ctx.shadowColor  = 'rgba(184,247,255,0.8)';
+  ctx.shadowBlur   = 18;
+  ctx.strokeStyle  = '#b8f7ff';
+  ctx.lineWidth    = 2.5;
+  ctx.strokeRect(x-w/2, y-h/2, w, h);
+  ctx.restore();
+
+  // Label bg
+  ctx.fillStyle = 'rgba(124,58,237,0.85)';
+  const textH = 18, textW = ctx.measureText('👻 ghost').width + 16;
+  ctx.beginPath();
+  ctx.roundRect(x-w/2, y-h/2-textH-4, textW, textH+4, 5);
+  ctx.fill();
+
+  // Label text
+  ctx.font = 'bold 13px Inter, sans-serif';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#fff';
+  ctx.fillText('👻 ghost', x-w/2+8, y-h/2-textH-1);
+
+  // Counter
+  counter++;
+  document.getElementById('counter-val').textContent = counter;
+  document.getElementById('stat-count').textContent  = counter;
+  document.getElementById('stat-unique').textContent = uniqueClasses.size;
+
+  // Bump chip
+  const chip = document.getElementById('counter-chip');
+  chip.classList.add('bump');
+  setTimeout(() => chip.classList.remove('bump'), 400);
+
+  // Flash
+  const flash = document.getElementById('detection-flash');
+  flash.classList.add('active');
+  setTimeout(() => flash.classList.remove('active'), 180);
+
+  // Ripple — convert bbox coords to camera-wrap coords
+  const wrap = document.getElementById('camera-wrap');
+  const scaleX = wrap.offsetWidth / canvas.width;
+  const scaleY = wrap.offsetHeight / canvas.height;
+  spawnRipple(x * scaleX, y * scaleY);
+
+  // EMF spike
+  setEMF(0.6 + Math.random() * 0.4);
+  setTimeout(() => setEMF(emfBase), 1200);
+
+  // Toast
+  showToast('Ghost detected! 👻');
+
+  // Vibrate
+  if(navigator.vibrate) navigator.vibrate([80, 40, 80]);
+}
+
+function detectLoop() {
+  requestAnimationFrame(detectLoop);
+  if(!model) return;
+
+  const now = Date.now();
+  // Throttle: only call the ML model every DETECT_INTERVAL_MS
+  if(now - lastDetectTime < DETECT_INTERVAL_MS) return;
+  lastDetectTime = now;
+
+  model.configure({ threshold: 0.15 });
+  model.detect(document.getElementById('video')).then(predictions => {
+    renderPredictions(predictions);
+
+    if(prevTime) {
+      pastFrameTimes.push(Date.now() - prevTime);
+      if(pastFrameTimes.length > 10) pastFrameTimes.shift();
+      const total = pastFrameTimes.reduce((a,b) => a + b/1000, 0);
+      const fps = Math.round(pastFrameTimes.length / total);
+      // Show inference rate, not frame rate, so label it accordingly
+      document.getElementById('fps-badge').textContent = fps + ' inf/s';
+    }
+    prevTime = Date.now();
+  }).catch(() => {});
+}
+
+// Register service worker
+if('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// Auto-start if on HTTPS (PWA)
+if(location.protocol === 'https:' || location.hostname === 'localhost') {
+  startApp();
+}
+// else: permission screen is visible by default for HTTP
+</script>
+</body>
+</html>
