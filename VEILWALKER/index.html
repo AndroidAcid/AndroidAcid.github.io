@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#000000"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="VEILWALKER"/>
+<link rel="manifest" href="manifest.json"/>
+<title>VEILWALKER</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=UnifrakturMaguntia&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  width:100%;height:100%;
+  background:#000;overflow:hidden;
+  font-family:'Share Tech Mono',monospace;
+  user-select:none;-webkit-tap-highlight-color:transparent;
+}
+
+/* ── Full-bleed camera ── */
+#video{
+  position:fixed;inset:0;width:100%;height:100%;
+  object-fit:cover;z-index:0;
+  filter:saturate(0.3) brightness(0.5) contrast(1.3);
+  transition:filter 0.8s ease;
+}
+#video.disturbed{
+  filter:saturate(0.15) brightness(0.35) contrast(1.6) hue-rotate(180deg);
+}
+
+/* ── Game canvas ── */
+#gc{position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;}
+
+/* ── Tap layer ── */
+#tap{position:fixed;inset:0;z-index:3;}
+
+/* ── Persistent vignette ── */
+#vignette{
+  position:fixed;inset:0;z-index:4;pointer-events:none;
+  background:radial-gradient(ellipse at center,
+    transparent 35%,
+    rgba(0,0,0,0.45) 65%,
+    rgba(0,0,0,0.88) 100%
+  );
+}
+
+/* ── Danger vignette — pulses when creature is close ── */
+#danger-vignette{
+  position:fixed;inset:0;z-index:5;pointer-events:none;
+  background:radial-gradient(ellipse at center,
+    transparent 30%,
+    rgba(80,0,0,0) 55%,
+    rgba(120,0,0,0.7) 100%
+  );
+  opacity:0;transition:opacity 0.4s ease;
+}
+
+/* ── CRT grain ── */
+#grain{
+  position:fixed;inset:0;z-index:6;pointer-events:none;
+  opacity:0.04;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size:200px 200px;
+  animation:grainShift 0.08s steps(1) infinite;
+}
+@keyframes grainShift{
+  0%  {background-position:0 0;}
+  25% {background-position:-40px -60px;}
+  50% {background-position:60px 20px;}
+  75% {background-position:-20px 40px;}
+}
+
+/* ── HUD ── */
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none;}
+
+/* Soul counter top-centre */
+#souls-wrap{
+  position:absolute;top:52px;left:50%;transform:translateX(-50%);
+  text-align:center;
+}
+#souls-title{
+  font-family:'Cinzel',serif;font-size:9px;letter-spacing:4px;
+  color:rgba(180,140,100,0.5);text-transform:uppercase;
+}
+#souls-count{
+  font-family:'UnifrakturMaguntia',cursive;font-size:38px;
+  color:#c8a870;
+  text-shadow:0 0 20px rgba(200,168,112,0.6),0 0 40px rgba(200,168,112,0.3);
+  line-height:1;margin-top:-4px;
+}
+
+/* Vitality bar — bottom left */
+#vitality-wrap{
+  position:absolute;bottom:88px;left:18px;right:18px;
+}
+#vitality-label{
+  font-size:8px;letter-spacing:3px;color:rgba(180,140,100,0.4);
+  text-transform:uppercase;margin-bottom:5px;
+}
+#vitality-track{
+  height:3px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:visible;
+  position:relative;
+}
+#vitality-fill{
+  height:100%;border-radius:100px;
+  background:linear-gradient(90deg,#8b0000,#c8a870);
+  box-shadow:0 0 8px rgba(200,168,112,0.5);
+  transition:width 0.4s ease,background 0.6s;
+  position:relative;
+}
+#vitality-fill.critical{
+  background:linear-gradient(90deg,#ff0000,#ff4400);
+  box-shadow:0 0 14px rgba(255,0,0,0.8);
+  animation:vitalPulse 0.5s ease-in-out infinite alternate;
+}
+@keyframes vitalPulse{
+  from{box-shadow:0 0 8px rgba(255,0,0,0.6);}
+  to  {box-shadow:0 0 24px rgba(255,0,0,1),0 0 40px rgba(255,0,0,0.4);}
+}
+
+/* Creature name tag — appears when something spawns */
+#creature-tag{
+  position:absolute;top:110px;left:50%;transform:translateX(-50%);
+  font-family:'Cinzel',serif;font-size:13px;letter-spacing:3px;
+  color:#c8a870;text-align:center;white-space:nowrap;
+  text-shadow:0 0 20px rgba(200,168,112,0.8);
+  opacity:0;transition:opacity 0.6s;pointer-events:none;
+}
+
+/* Motion reading — top right */
+#motion-pip{
+  position:absolute;top:56px;right:18px;
+  font-size:8px;letter-spacing:1.5px;color:rgba(180,140,100,0.3);
+  text-align:right;line-height:1.8;
+}
+#motion-level{color:rgba(200,168,112,0.5);}
+
+/* Warning text */
+#warning{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-family:'Cinzel',serif;font-size:22px;font-weight:900;letter-spacing:5px;
+  color:#8b0000;text-shadow:0 0 30px #ff0000;
+  text-align:center;pointer-events:none;
+  opacity:0;text-transform:uppercase;
+}
+
+/* Screen flash on hit */
+#hit-flash{
+  position:fixed;inset:0;z-index:20;pointer-events:none;
+  background:rgba(255,255,255,0);
+  transition:background 0.05s;
+}
+#hit-flash.flash{background:rgba(255,255,255,0.15);}
+
+/* Start screen */
+#start{
+  position:fixed;inset:0;z-index:100;
+  background:radial-gradient(ellipse at center,#0a0005 0%,#000 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;padding:40px;text-align:center;
+}
+#start.hidden{display:none;}
+#start-title{
+  font-family:'UnifrakturMaguntia',cursive;
+  font-size:58px;color:#c8a870;
+  text-shadow:0 0 40px rgba(200,168,112,0.7),0 0 80px rgba(200,168,112,0.3);
+  line-height:0.9;
+}
+#start-sub{
+  font-family:'Cinzel',serif;font-size:10px;letter-spacing:5px;
+  color:rgba(200,168,112,0.5);text-transform:uppercase;margin-top:4px;
+}
+#start-body{
+  font-size:12px;color:rgba(255,255,255,0.3);line-height:2;
+  max-width:300px;margin-top:8px;
+  font-family:'Share Tech Mono',monospace;
+}
+#start-body b{color:rgba(200,168,112,0.7);}
+#start-btn{
+  margin-top:12px;padding:16px 44px;
+  border:1px solid rgba(200,168,112,0.4);border-radius:2px;
+  background:rgba(200,168,112,0.05);
+  font-family:'Cinzel',serif;font-size:12px;font-weight:600;
+  letter-spacing:4px;text-transform:uppercase;
+  color:#c8a870;cursor:pointer;
+  box-shadow:0 0 30px rgba(200,168,112,0.15);
+  transition:all 0.3s;
+}
+#start-btn:active{background:rgba(200,168,112,0.12);}
+
+/* Game over */
+#game-over{
+  position:fixed;inset:0;z-index:100;
+  background:rgba(0,0,0,0.92);backdrop-filter:blur(6px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;opacity:0;pointer-events:none;transition:opacity 1s;
+}
+#game-over.show{opacity:1;pointer-events:all;}
+#go-title{
+  font-family:'UnifrakturMaguntia',cursive;font-size:52px;
+  color:#8b0000;
+  text-shadow:0 0 30px #ff0000,0 0 60px rgba(255,0,0,0.4);
+}
+#go-souls{font-family:'Cinzel',serif;font-size:14px;color:#c8a870;letter-spacing:3px;}
+#go-best{font-size:10px;color:rgba(200,168,112,0.4);letter-spacing:2px;}
+#go-btn{
+  margin-top:10px;padding:14px 36px;
+  border:1px solid rgba(200,168,112,0.35);border-radius:2px;
+  background:transparent;
+  font-family:'Cinzel',serif;font-size:11px;font-weight:600;
+  letter-spacing:3px;text-transform:uppercase;
+  color:#c8a870;cursor:pointer;transition:all 0.2s;
+}
+#go-btn:active{background:rgba(200,168,112,0.08);}
+
+/* Tap ripple */
+.tap-ripple{
+  position:fixed;border-radius:50%;
+  border:1.5px solid rgba(200,168,112,0.6);
+  pointer-events:none;z-index:15;
+  animation:tapRipple 0.5s ease-out forwards;
+}
+@keyframes tapRipple{
+  from{opacity:0.9;transform:scale(0.2);}
+  to  {opacity:0;  transform:scale(2.5);}
+}
+
+/* Scanlines */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(to bottom,
+    transparent 0px,transparent 3px,
+    rgba(0,0,0,0.07) 3px,rgba(0,0,0,0.07) 4px);
+}
+</style>
+</head>
+<body>
+
+<video id="video" autoplay muted playsinline></video>
+<canvas id="gc"></canvas>
+<div id="tap"></div>
+
+<!-- Atmosphere layers -->
+<div id="vignette"></div>
+<div id="danger-vignette"></div>
+<div id="grain"></div>
+<div id="hit-flash"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="souls-wrap">
+    <div id="souls-title">Souls Banished</div>
+    <div id="souls-count">0</div>
+  </div>
+  <div id="motion-pip">
+    <div>THE VEIL</div>
+    <div id="motion-level">STILL</div>
+  </div>
+  <div id="creature-tag"></div>
+  <div id="warning"></div>
+  <div id="vitality-wrap">
+    <div id="vitality-label">Vitality</div>
+    <div id="vitality-track">
+      <div id="vitality-fill" style="width:100%"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Start screen -->
+<div id="start">
+  <div id="start-title">Veilwalker</div>
+  <div id="start-sub">Walk the thin place</div>
+  <p id="start-body">
+    Creatures from beyond the veil<br>
+    will find you as you <b>walk</b>.<br><br>
+    <b>Tap them</b> to repel their advance.<br>
+    Strike enough times to banish them.<br><br>
+    Do not let them reach you.
+  </p>
+  <button id="start-btn" onclick="startGame()">Enter the Veil</button>
+</div>
+
+<!-- Game over -->
+<div id="game-over">
+  <div id="go-title">Consumed</div>
+  <div id="go-souls">Souls banished: <span id="go-count">0</span></div>
+  <div id="go-best">Best: <span id="go-best-val">0</span></div>
+  <button id="go-btn" onclick="restartGame()">Return</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   VEILWALKER
+   Atmospheric AR creature encounter game.
+   Creatures materialise as you walk. Tap to repel them.
+   Pixel-diff engine detects your movement and stirs the veil.
+═══════════════════════════════════════════════════════════ */
+
+const canvas  = document.getElementById('gc');
+const ctx     = canvas.getContext('2d');
+const video   = document.getElementById('video');
+const tapEl   = document.getElementById('tap');
+const proc    = document.createElement('canvas');
+const pctx    = proc.getContext('2d', {willReadFrequently:true});
+
+function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+window.addEventListener('resize', resize);
+resize();
+
+// ── State ──────────────────────────────────────────────────
+let gameActive = false;
+let souls = 0, bestSouls = parseInt(localStorage.getItem('vw_best')||'0');
+let vitality = 100, lastDamageTime = 0;
+const VITALITY_RECHARGE = 0.025; // per frame, ~1.5/s
+const VITALITY_DELAY    = 5000;  // ms after last hit
+
+// ── Creature roster ────────────────────────────────────────
+const CREATURE_TYPES = [
+  {
+    name:   'Wraith',
+    desc:   'a restless soul',
+    hp:     3,
+    speed:  0.28,
+    size:   55,
+    color:  '#aaddff',
+    glow:   'rgba(150,210,255,',
+    shape:  'wraith',
+    dmg:    12,
+    recoil: 180,
+  },
+  {
+    name:   'Revenant',
+    desc:   'it remembers you',
+    hp:     6,
+    speed:  0.18,
+    size:   72,
+    color:  '#ff6644',
+    glow:   'rgba(255,100,60,',
+    shape:  'revenant',
+    dmg:    22,
+    recoil: 100,
+  },
+  {
+    name:   'Shade',
+    desc:   'barely visible',
+    hp:     2,
+    speed:  0.42,
+    size:   40,
+    color:  '#8866cc',
+    glow:   'rgba(136,100,200,',
+    shape:  'shade',
+    dmg:    8,
+    recoil: 220,
+    cloaked: true,  // only visible within 200px
+  },
+  {
+    name:   'Devourer',
+    desc:   'ancient and hungry',
+    hp:     12,
+    speed:  0.12,
+    size:   100,
+    color:  '#ff2200',
+    glow:   'rgba(255,30,0,',
+    shape:  'devourer',
+    dmg:    35,
+    recoil: 60,
+  },
+];
+
+// ── Active creatures ───────────────────────────────────────
+const creatures  = [];
+const particles  = [];
+const floaters   = [];
+
+// ── Spawn timing — slow and deliberate ────────────────────
+let nextSpawnAt   = 0;
+const SPAWN_MIN   = 12000; // at least 12s between spawns
+const SPAWN_MAX   = 28000; // up to 28s (random)
+let spawnInterval = SPAWN_MIN;
+let warnShown     = false;
+
+// ── Motion detection ──────────────────────────────────────
+let prevFrame=null, warmup=0, lastProc=0;
+const PROC_MS = 200;
+let motionLevel = 0; // 0–100 rolling average
+
+// ── Helper: screen centre ─────────────────────────────────
+const cx = ()=>canvas.width/2;
+const cy = ()=>canvas.height/2;
+
+// ── Start ─────────────────────────────────────────────────
+function startGame(){
+  document.getElementById('start').classList.add('hidden');
+  navigator.mediaDevices.getUserMedia({
+    audio:false,
+    video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}
+  }).then(stream=>{
+    video.srcObject=stream;
+    video.onloadeddata=()=>{
+      video.play();
+      proc.width =Math.round(video.videoWidth /4)||160;
+      proc.height=Math.round(video.videoHeight/4)||90;
+    };
+  }).catch(()=>{});  // runs without camera too
+
+  souls=0; vitality=100; lastDamageTime=0;
+  creatures.length=0; particles.length=0; floaters.length=0;
+  updateHUD();
+  scheduleNextSpawn(6000); // first creature after 6 seconds
+  gameActive=true;
+  requestAnimationFrame(loop);
+}
+
+function restartGame(){
+  document.getElementById('game-over').classList.remove('show');
+  souls=0; vitality=100; lastDamageTime=0;
+  creatures.length=0; particles.length=0; floaters.length=0;
+  updateHUD();
+  scheduleNextSpawn(6000);
+  gameActive=true;
+}
+
+function scheduleNextSpawn(overrideMs){
+  const delay = overrideMs ?? (SPAWN_MIN + Math.random()*(SPAWN_MAX-SPAWN_MIN));
+  nextSpawnAt = Date.now() + delay;
+}
+
+// ── Spawn creature ─────────────────────────────────────────
+function spawnCreature(){
+  // Weight type by how many souls banished (harder types appear later)
+  const pool = souls < 3  ? [0,0,0,1] :
+               souls < 8  ? [0,0,1,1,2] :
+               souls < 15 ? [0,1,1,2,2,3] :
+                            [0,1,2,2,3,3];
+  const typeIdx = pool[Math.floor(Math.random()*pool.length)];
+  const type = CREATURE_TYPES[typeIdx];
+
+  // Spawn off the edge of the screen, bias toward a random edge
+  const W=canvas.width, H=canvas.height;
+  const edge=Math.floor(Math.random()*4);
+  let x,y;
+  if(edge===0)      {x=W*0.2+Math.random()*W*0.6; y=-type.size-20;}
+  else if(edge===1) {x=W+type.size+20;             y=H*0.15+Math.random()*H*0.7;}
+  else if(edge===2) {x=W*0.2+Math.random()*W*0.6; y=H+type.size+20;}
+  else              {x=-type.size-20;              y=H*0.15+Math.random()*H*0.7;}
+
+  // Drift angle toward screen centre with slight random offset
+  const ang = Math.atan2(cy()-y, cx()-x) + (Math.random()-.5)*0.5;
+
+  creatures.push({
+    x, y,
+    vx: Math.cos(ang)*type.speed,
+    vy: Math.sin(ang)*type.speed,
+    hp: type.hp,
+    maxHp: type.hp,
+    type,
+    size: type.size,
+    color: type.color,
+    glow: type.glow,
+    shape: type.shape,
+    dmg: type.dmg,
+    recoil: type.recoil,
+    cloaked: type.cloaked||false,
+    // materialise animation
+    opacity: 0,
+    materialising: true,
+    // recoil state
+    recoiling: false,
+    recoilVx: 0, recoilVy: 0,
+    recoilDecay: 0,
+    // visual state
+    age: 0,
+    hitFlash: 0,
+    flickerPhase: Math.random()*Math.PI*2,
+    dead: false,
+  });
+
+  showCreatureTag(type.name, type.desc);
+  scheduleNextSpawn();
+}
+
+// ── Creature name reveal ───────────────────────────────────
+function showCreatureTag(name, desc){
+  const el = document.getElementById('creature-tag');
+  el.innerHTML = `<span style="font-size:16px">${name}</span><br><span style="font-size:9px;color:rgba(200,168,112,0.4);letter-spacing:2px">${desc}</span>`;
+  el.style.opacity='1';
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.style.opacity='0', 3500);
+}
+
+// ── HUD ───────────────────────────────────────────────────
+function updateHUD(){
+  document.getElementById('souls-count').textContent=souls;
+  const pct=Math.max(0,vitality);
+  document.getElementById('vitality-fill').style.width=pct+'%';
+  document.getElementById('vitality-fill').classList.toggle('critical', pct<25);
+}
+
+function endGame(){
+  gameActive=false;
+  document.getElementById('go-count').textContent=souls;
+  document.getElementById('go-best-val').textContent=bestSouls;
+  document.getElementById('game-over').classList.add('show');
+  if(navigator.vibrate) navigator.vibrate([300,100,300,100,600]);
+}
+
+// ── Tap handler ────────────────────────────────────────────
+tapEl.addEventListener('pointerdown', e=>{
+  if(!gameActive) return;
+  const tx=e.clientX, ty=e.clientY;
+
+  // Spawn tap ripple
+  spawnTapRipple(tx, ty);
+
+  // Check hit on any creature
+  let hit=false;
+  for(const c of creatures){
+    if(c.dead||c.materialising) continue;
+    const dist=Math.hypot(c.x-tx, c.y-ty);
+    const hitR = c.size*(c.cloaked?0.6:1.1); // shades have tighter hitbox
+    if(dist < hitR){
+      hitCreature(c, tx, ty);
+      hit=true;
+      break;
+    }
+  }
+
+  if(hit){
+    // White flash
+    const flash=document.getElementById('hit-flash');
+    flash.classList.add('flash');
+    setTimeout(()=>flash.classList.remove('flash'),80);
+    if(navigator.vibrate) navigator.vibrate(40);
+  }
+});
+
+function hitCreature(c, tx, ty){
+  c.hp--;
+  c.hitFlash=1.0;
+
+  // Recoil — push away from tap point
+  const ang = Math.atan2(c.y-ty, c.x-tx);
+  c.recoiling=true;
+  c.recoilVx=Math.cos(ang)*(c.recoil/60);
+  c.recoilVy=Math.sin(ang)*(c.recoil/60);
+  c.recoilDecay=0.88;
+
+  // Spawn impact sparks
+  spawnSparks(c.x, c.y, c.color, 12);
+
+  // Floating damage indicator
+  floaters.push({
+    x:c.x+(Math.random()-.5)*40,
+    y:c.y-c.size*.5,
+    text:'✦',
+    life:1.0,
+    color:c.color,
+    vy:-1.2,
+  });
+
+  if(c.hp<=0) banishCreature(c);
+}
+
+function banishCreature(c){
+  c.dead=true;
+  souls++;
+  if(souls>bestSouls){ bestSouls=souls; localStorage.setItem('vw_best',bestSouls); }
+  updateHUD();
+  spawnSparks(c.x, c.y, c.color, 40);
+  spawnSparks(c.x, c.y, '#ffffff', 15);
+  floaters.push({x:c.x,y:c.y-c.size*.7,text:'Banished',life:1.0,color:c.color,vy:-0.7,size:14});
+  if(navigator.vibrate) navigator.vibrate([60,30,120,30,60]);
+}
+
+// ── Particles ──────────────────────────────────────────────
+function spawnSparks(x,y,color,n){
+  for(let i=0;i<n;i++){
+    const ang=Math.random()*Math.PI*2;
+    const spd=0.5+Math.random()*3;
+    particles.push({
+      x,y,
+      vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd,
+      life:1.0, decay:0.02+Math.random()*0.03,
+      size:1+Math.random()*2.5, color,
+    });
+  }
+}
+
+function spawnTapRipple(tx,ty){
+  const r=document.createElement('div');
+  r.className='tap-ripple';
+  r.style.cssText=`left:${tx-30}px;top:${ty-30}px;width:60px;height:60px;`;
+  document.body.appendChild(r);
+  setTimeout(()=>r.remove(),500);
+}
+
+// ── Motion detection ──────────────────────────────────────
+function processMotion(now){
+  if(now-lastProc<PROC_MS) return;
+  if(video.readyState<2||!proc.width) return;
+  lastProc=now;
+  pctx.drawImage(video,0,0,proc.width,proc.height);
+  const cur=pctx.getImageData(0,0,proc.width,proc.height);
+  if(warmup<5){prevFrame=cur;warmup++;return;}
+  if(!prevFrame){prevFrame=cur;return;}
+  const cd=cur.data,pd=prevFrame.data;
+  let changed=0,total=proc.width*proc.height;
+  for(let i=0;i<cd.length;i+=4){
+    const d=(Math.abs(cd[i]-pd[i])+Math.abs(cd[i+1]-pd[i+1])+Math.abs(cd[i+2]-pd[i+2]))/3;
+    if(d>22) changed++;
+  }
+  const rawPct=(changed/total)*100;
+  // Smooth rolling average
+  motionLevel=motionLevel*0.7+rawPct*0.3;
+
+  // Update veil status display
+  const mv=document.getElementById('motion-level');
+  if(motionLevel>8)      mv.textContent='TURBULENT';
+  else if(motionLevel>3) mv.textContent='STIRRING';
+  else if(motionLevel>1) mv.textContent='RESTLESS';
+  else                   mv.textContent='STILL';
+
+  // Motion disturbs the video filter
+  video.classList.toggle('disturbed', motionLevel>10);
+
+  // High motion speeds up next spawn slightly
+  if(motionLevel>6 && nextSpawnAt-Date.now()>8000){
+    nextSpawnAt-=800;
+  }
+
+  prevFrame=cur;
+}
+
+// ── Draw creature shapes ───────────────────────────────────
+function drawCreature(c, now){
+  const {x,y,size,color,glow,shape,opacity,hitFlash,age,flickerPhase,cloaked,hp,maxHp} = c;
+
+  // Shades only visible when close
+  let visAlpha=opacity;
+  if(cloaked){
+    const dist=Math.hypot(x-cx(),y-cy());
+    visAlpha = opacity * Math.max(0, Math.min(1,(200-dist)/180));
+  }
+  if(visAlpha<0.01) return;
+
+  // Natural flicker
+  const flicker = 0.85+Math.sin(now*0.004+flickerPhase)*0.1
+                     +Math.sin(now*0.013+flickerPhase*2)*0.05;
+  const alpha = visAlpha*flicker*(hitFlash>0?1:1);
+
+  ctx.save();
+  ctx.globalAlpha=alpha;
+  ctx.translate(x,y);
+
+  // Glow aura
+  const glowPulse = 0.3+Math.sin(now*0.003+flickerPhase)*0.15;
+  const gradient  = ctx.createRadialGradient(0,0,size*0.3,0,0,size*1.6);
+  gradient.addColorStop(0, glow+''+glowPulse+')');
+  gradient.addColorStop(1, glow+'0)');
+  ctx.fillStyle=gradient;
+  ctx.beginPath();ctx.arc(0,0,size*1.6,0,Math.PI*2);ctx.fill();
+
+  // Body
+  const bodyAlpha=hitFlash>0?1:alpha;
+  ctx.globalAlpha=bodyAlpha;
+  ctx.shadowColor=hitFlash>0?'#ffffff':color;
+  ctx.shadowBlur=hitFlash>0?40:20+Math.sin(now*0.004)*8;
+  ctx.strokeStyle=hitFlash>0?'rgba(255,255,255,0.9)':color;
+  ctx.lineWidth=hitFlash>0?3:2;
+
+  if(shape==='wraith'){
+    drawWraith(ctx, size, now, flickerPhase);
+  } else if(shape==='revenant'){
+    drawRevenant(ctx, size, now, flickerPhase);
+  } else if(shape==='shade'){
+    drawShade(ctx, size, now, flickerPhase);
+  } else if(shape==='devourer'){
+    drawDevourer(ctx, size, now, flickerPhase);
+  }
+
+  // HP pip row above creature
+  if(hp<maxHp && opacity>0.5){
+    ctx.globalAlpha=alpha*0.7;
+    ctx.shadowBlur=0;
+    const pipW=10,pipH=4,gap=3,total=maxHp;
+    const rowW=(pipW+gap)*total-gap;
+    for(let i=0;i<total;i++){
+      const px=-rowW/2+i*(pipW+gap);
+      ctx.fillStyle=i<hp?color:'rgba(255,255,255,0.1)';
+      ctx.fillRect(px,-size-16,pipW,pipH);
+    }
+  }
+
+  ctx.restore();
+}
+
+// ── Creature body renderers ────────────────────────────────
+function drawWraith(ctx,size,now,phase){
+  // Flowing hood shape
+  const t=now*0.002;
+  ctx.beginPath();
+  ctx.moveTo(0,-size);
+  // Left side with wave
+  for(let i=0;i<=8;i++){
+    const a=-Math.PI/2+Math.PI*(i/8);
+    const wave=Math.sin(t*1.5+i*0.8+phase)*size*0.12;
+    ctx.lineTo((Math.cos(a)+wave*0.3)*size*0.8, Math.sin(a)*size*0.7);
+  }
+  // Wispy tentacles at bottom
+  ctx.lineTo(size*0.3, size*0.5);
+  ctx.quadraticCurveTo(size*0.5+Math.sin(t+phase)*20, size+Math.sin(t*1.3)*15, size*0.1, size*0.9);
+  ctx.quadraticCurveTo(0, size+Math.cos(t)*12, -size*0.1, size*0.9);
+  ctx.quadraticCurveTo(-size*0.5+Math.cos(t+phase)*20, size+Math.sin(t*1.5)*15, -size*0.3, size*0.5);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.globalAlpha*=0.08; ctx.fillStyle=ctx.strokeStyle; ctx.fill(); ctx.globalAlpha/=0.08;
+  // Eyes
+  [-0.25,0.25].forEach(ox=>{
+    ctx.beginPath();
+    ctx.arc(ox*size,-size*0.15,size*0.1,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.shadowColor='#ffffff'; ctx.shadowBlur=15;
+    ctx.globalAlpha*=0.9; ctx.fill(); ctx.globalAlpha/=0.9;
+  });
+}
+
+function drawRevenant(ctx,size,now,phase){
+  const t=now*0.0015;
+  // Hunched humanoid outline
+  ctx.beginPath();
+  // Head
+  ctx.arc(0,-size*0.65,size*0.22,0,Math.PI*2);
+  ctx.stroke();
+  // Torso — jagged
+  ctx.beginPath();
+  ctx.moveTo(-size*0.3,-size*0.4);
+  ctx.lineTo(-size*0.35,size*0.1);
+  ctx.lineTo(-size*0.5,size*0.15+Math.sin(t+phase)*8);
+  ctx.lineTo(-size*0.15,size*0.5);
+  ctx.lineTo(0,size*0.45+Math.sin(t*1.3)*6);
+  ctx.lineTo(size*0.15,size*0.5);
+  ctx.lineTo(size*0.5,size*0.15+Math.sin(t+phase)*8);
+  ctx.lineTo(size*0.35,size*0.1);
+  ctx.lineTo(size*0.3,-size*0.4);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.globalAlpha*=0.06; ctx.fillStyle=ctx.strokeStyle; ctx.fill(); ctx.globalAlpha/=0.06;
+  // Glowing eyes
+  [-0.1,0.1].forEach(ox=>{
+    ctx.beginPath();
+    ctx.arc(ox*size,-size*0.65,size*0.06,0,Math.PI*2);
+    ctx.fillStyle='#ff6644'; ctx.shadowColor='#ff4400'; ctx.shadowBlur=20;
+    ctx.fill();
+  });
+}
+
+function drawShade(ctx,size,now,phase){
+  const t=now*0.003;
+  // Simple shifting amorphous blob
+  ctx.beginPath();
+  const pts=8;
+  for(let i=0;i<=pts;i++){
+    const a=(i/pts)*Math.PI*2;
+    const r=size*(0.7+Math.sin(t*1.2+a*2.3+phase)*0.25+Math.cos(t*0.7+a*1.7)*0.15);
+    i===0?ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r):ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);
+  }
+  ctx.closePath();ctx.stroke();
+  ctx.globalAlpha*=0.07; ctx.fillStyle=ctx.strokeStyle; ctx.fill(); ctx.globalAlpha/=0.07;
+}
+
+function drawDevourer(ctx,size,now,phase){
+  const t=now*0.001;
+  // Large pulsing mass with spines
+  const spines=12;
+  ctx.beginPath();
+  for(let i=0;i<=spines*2;i++){
+    const a=(i/(spines*2))*Math.PI*2;
+    const inner=size*(0.45+Math.sin(t*2+phase)*0.06);
+    const outer=size*(0.85+Math.sin(t*1.5+a*3+phase)*0.12);
+    const r=i%2===0?outer:inner;
+    i===0?ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r):ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);
+  }
+  ctx.closePath();ctx.stroke();
+  ctx.globalAlpha*=0.1; ctx.fillStyle=ctx.strokeStyle; ctx.fill(); ctx.globalAlpha/=0.1;
+  // Central mass
+  ctx.beginPath();
+  ctx.arc(0,0,size*0.35+Math.sin(t*3)*size*0.05,0,Math.PI*2);
+  ctx.stroke();
+  // Multiple eyes
+  const eyeCount=3;
+  for(let i=0;i<eyeCount;i++){
+    const ea=(i/eyeCount)*Math.PI*2+t*0.4;
+    const er=size*0.2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(ea)*er,Math.sin(ea)*er,size*0.07,0,Math.PI*2);
+    ctx.fillStyle='#ff2200'; ctx.shadowColor='#ff2200'; ctx.shadowBlur=20;
+    ctx.fill();
+  }
+}
+
+// ── Proximity danger effect ────────────────────────────────
+function updateDangerVignette(){
+  let closest=Infinity;
+  for(const c of creatures){
+    if(c.dead) continue;
+    closest=Math.min(closest,Math.hypot(c.x-cx(),c.y-cy()));
+  }
+  const danger=creatures.length>0?Math.max(0,1-(closest/320)):0;
+  document.getElementById('danger-vignette').style.opacity=danger*0.85;
+  document.getElementById('warning').style.opacity=danger>0.7?danger-0.7:0;
+  if(danger>0.85) document.getElementById('warning').textContent='IT IS CLOSE';
+  else if(danger>0.75) document.getElementById('warning').textContent='TOO CLOSE';
+  else document.getElementById('warning').textContent='';
+}
+
+// ── Main loop ─────────────────────────────────────────────
+let lastFrame=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=Math.min((now-lastFrame)/16.67,3);
+  lastFrame=now;
+
+  processMotion(now);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!gameActive) return;
+
+  // ── Spawn check ──────────────────────────────────────────
+  if(Date.now()>=nextSpawnAt && creatures.filter(c=>!c.dead).length<3){
+    spawnCreature();
+  }
+
+  // ── Vitality recharge ────────────────────────────────────
+  if(vitality>0 && vitality<100 && (now-lastDamageTime)>VITALITY_DELAY){
+    vitality=Math.min(100,vitality+VITALITY_RECHARGE*dt);
+    updateHUD();
+  }
+
+  // ── Update creatures ─────────────────────────────────────
+  for(const c of creatures){
+    if(c.dead) continue;
+    c.age+=dt;
+    c.hitFlash=Math.max(0,c.hitFlash-0.06*dt);
+
+    // Materialise fade-in
+    if(c.materialising){
+      c.opacity=Math.min(1,c.opacity+0.004*dt);
+      if(c.opacity>=1) c.materialising=false;
+    }
+
+    // Recoil movement — overrides normal drift while active
+    if(c.recoiling){
+      c.x+=c.recoilVx*dt;
+      c.y+=c.recoilVy*dt;
+      c.recoilVx*=c.recoilDecay;
+      c.recoilVy*=c.recoilDecay;
+      if(Math.hypot(c.recoilVx,c.recoilVy)<0.05) c.recoiling=false;
+    } else {
+      // Normal drift toward player centre — slow and menacing
+      const dx=cx()-c.x, dy=cy()-c.y;
+      const dist=Math.hypot(dx,dy);
+      if(dist>1){
+        // Gentle steering
+        const targetVx=(dx/dist)*c.type.speed;
+        const targetVy=(dy/dist)*c.type.speed;
+        c.vx+=(targetVx-c.vx)*0.02*dt;
+        c.vy+=(targetVy-c.vy)*0.02*dt;
+      }
+      // Slight organic drift
+      c.vx+=Math.sin(now*0.0008+c.flickerPhase)*0.008*dt;
+      c.vy+=Math.cos(now*0.0011+c.flickerPhase)*0.008*dt;
+      c.x+=c.vx*dt;
+      c.y+=c.vy*dt;
+    }
+
+    // Creature reached the player
+    if(Math.hypot(c.x-cx(),c.y-cy())<c.size*0.5+30){
+      vitality-=c.dmg;
+      lastDamageTime=now;
+      updateHUD();
+      // Knock it back a bit so it doesn't perma-drain
+      const repAng=Math.atan2(c.y-cy(),c.x-cx());
+      c.recoiling=true;
+      c.recoilVx=Math.cos(repAng)*3;
+      c.recoilVy=Math.sin(repAng)*3;
+      c.recoilDecay=0.88;
+      if(navigator.vibrate) navigator.vibrate([80,40,160]);
+      if(vitality<=0){ endGame(); return; }
+    }
+  }
+
+  // Remove fully banished + faded creatures
+  for(let i=creatures.length-1;i>=0;i--){
+    if(creatures[i].dead) creatures.splice(i,1);
+  }
+
+  // ── Update particles ────────────────────────────────────
+  for(const p of particles){
+    p.x+=p.vx*dt; p.y+=p.vy*dt;
+    p.vy+=0.04*dt;
+    p.life-=p.decay*dt;
+  }
+  for(let i=particles.length-1;i>=0;i--) if(particles[i].life<=0) particles.splice(i,1);
+
+  // ── Update floaters ─────────────────────────────────────
+  for(const f of floaters){ f.y+=f.vy*dt; f.life-=0.018*dt; }
+  for(let i=floaters.length-1;i>=0;i--) if(floaters[i].life<=0) floaters.splice(i,1);
+
+  // ── DRAW ────────────────────────────────────────────────
+
+  // Creatures (back to front by y)
+  const sorted=[...creatures].sort((a,b)=>a.y-b.y);
+  for(const c of sorted) drawCreature(c, now);
+
+  // Particles
+  for(const p of particles){
+    ctx.save();
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+    ctx.fillStyle=p.color; ctx.globalAlpha=p.life;
+    ctx.shadowColor=p.color; ctx.shadowBlur=8;
+    ctx.fill(); ctx.restore();
+  }
+
+  // Floaters
+  for(const f of floaters){
+    ctx.save();
+    ctx.font=`${f.size||12}px 'Cinzel', serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle=f.color; ctx.globalAlpha=f.life;
+    ctx.shadowColor=f.color; ctx.shadowBlur=12;
+    ctx.fillText(f.text,f.x,f.y);
+    ctx.restore();
+  }
+
+  // Danger proximity effects
+  updateDangerVignette();
+}
+
+requestAnimationFrame(loop);
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
+</body>
+</html>
