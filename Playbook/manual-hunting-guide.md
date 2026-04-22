@@ -228,7 +228,7 @@ Identical responses with different sessions = IDOR confirmed.
 ```bash
 # Baseline — authenticated
 curl -s "https://api.target.com/api/v1/account" \
-  -H "Authorization: Bearer YOUR_TOKEN"
+  -H "Authorization: Bearer YOUR_TOKEN" \
 # → {"id":1234,"email":"you@example.com","balance":"$500"}
 
 # Test — no auth at all
