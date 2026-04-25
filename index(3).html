@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#00ff66" />
+  <meta name="description" content="Android Acid — Acid, Synths, and Software." />
+  <title>Android Acid</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    /* ── Buy Me a Coffee button ── */
+    .bmc-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 14px;
+      background: #FFDD00;
+      color: #000;
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-decoration: none;
+      border-radius: 4px;
+      border: 2px solid #000;
+      white-space: nowrap;
+      transition: background 0.15s, transform 0.12s, box-shadow 0.12s;
+      box-shadow: 2px 2px 0 #000;
+      line-height: 1;
+    }
+    .bmc-btn:hover {
+      background: #ffe533;
+      transform: translate(-1px, -1px);
+      box-shadow: 3px 3px 0 #000;
+    }
+    .bmc-btn:active {
+      transform: translate(1px, 1px);
+      box-shadow: 1px 1px 0 #000;
+    }
+    .bmc-btn svg {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+    }
+
+    /* ── Header placement ── */
+    .nav .bmc-btn {
+      margin-left: 8px;
+    }
+
+    /* ── Hero placement ── */
+    .hero-bmc {
+      margin-top: 20px;
+    }
+    .hero-bmc .bmc-btn {
+      font-size: 0.9rem;
+      padding: 9px 18px;
+    }
+
+    /* ── Footer placement ── */
+    .footer-bmc {
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <div class="brand">
+        <img class="logo" src="assets/logo.svg" alt="Android Acid logo" />
+        <div class="brand-text">
+          <div class="brand-title">ANDROID ACID</div>
+          <div class="brand-sub">Acid • Synths • Software</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="#music">Music</a>
+        <a href="#software">Software</a>
+        <a href="#studio">Studio</a>
+        <a href="#contact">Contact</a>
+        <!-- Buy Me a Coffee — header -->
+        <a class="bmc-btn" href="https://buymeacoffee.com/androidacid" target="_blank" rel="noreferrer" aria-label="Buy me a coffee">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M20.216 6.415l-.132-.666c-.119-.598-.388-1.163-1.001-1.379-.197-.069-.42-.098-.57-.241-.152-.143-.196-.366-.231-.572-.065-.378-.125-.756-.192-1.133-.057-.325-.102-.69-.25-.987-.195-.4-.597-.634-.996-.788a5.723 5.723 0 00-.626-.194c-1.559-.4-3.291-.27-4.677.054-1.228.28-2.473.72-3.445 1.472C7.266 2.637 6.99 3.410 7 4.19c.01.943.396 1.870 1.105 2.444.251.203.542.378.86.4.316.022.642-.04.886-.234C10.208 6.499 10.625 6 11.277 6c.674 0 1.007.462 1.607.462.589 0 .916-.462 1.607-.462.674 0 1.007.462 1.607.462.589 0 .879-.386 1.5-.462.624-.077.944.308 1.277.462" fill="#000"/>
+            <path d="M5 8.5c-.828 0-1.5.672-1.5 1.5v4.5c0 2.485 2.015 4.5 4.5 4.5h8c2.485 0 4.5-2.015 4.5-4.5V10c0-.828-.672-1.5-1.5-1.5H5z" fill="#000"/>
+            <path d="M18.5 8.5H20c1.105 0 2 .895 2 2v1c0 1.105-.895 2-2 2h-1.5" stroke="#000" stroke-width="1.5"/>
+          </svg>
+          Buy me a coffee
+        </a>
+      </nav>
+      <button class="menu-btn" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="site-banner-image">
+    <img src="assets/banner.jpg" alt="Android Acid banner" />
+  </div>
+
+  <main id="content">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <h1 class="glow">Acid, noise, and machines that argue back.</h1>
+          <p class="muted">
+            Welcome to <strong>Android Acid</strong>. This is my home for releases, weird little audio tools,
+            and photos from the studio.
+          </p>
+          <div class="chips" aria-label="tags">
+            <a class="btn" href="#music">Music</a>
+            <a class="btn" href="#software">Software</a>
+            <a class="btn" href="#studio">Studio</a>
+            <a class="btn" href="#contact">Contact</a>
+          </div>
+          <!-- Buy Me a Coffee — hero -->
+          <div class="hero-bmc">
+            <a class="bmc-btn" href="https://buymeacoffee.com/androidacid" target="_blank" rel="noreferrer" aria-label="Support Android Acid on Buy Me a Coffee">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M20.216 6.415l-.132-.666c-.119-.598-.388-1.163-1.001-1.379-.197-.069-.42-.098-.57-.241-.152-.143-.196-.366-.231-.572-.065-.378-.125-.756-.192-1.133-.057-.325-.102-.69-.25-.987-.195-.4-.597-.634-.996-.788a5.723 5.723 0 00-.626-.194c-1.559-.4-3.291-.27-4.677.054-1.228.28-2.473.72-3.445 1.472C7.266 2.637 6.99 3.410 7 4.19c.01.943.396 1.870 1.105 2.444.251.203.542.378.86.4.316.022.642-.04.886-.234C10.208 6.499 10.625 6 11.277 6c.674 0 1.007.462 1.607.462.589 0 .916-.462 1.607-.462.674 0 1.007.462 1.607.462.589 0 .879-.386 1.5-.462.624-.077.944.308 1.277.462" fill="#000"/>
+                <path d="M5 8.5c-.828 0-1.5.672-1.5 1.5v4.5c0 2.485 2.015 4.5 4.5 4.5h8c2.485 0 4.5-2.015 4.5-4.5V10c0-.828-.672-1.5-1.5-1.5H5z" fill="#000"/>
+                <path d="M18.5 8.5H20c1.105 0 2 .895 2 2v1c0 1.105-.895 2-2 2h-1.5" stroke="#000" stroke-width="1.5"/>
+              </svg>
+              Buy me a coffee
+            </a>
+          </div>
+        </div>
+        <div class="hero-card">
+          <div class="panel">
+            <div class="panel-top">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              <span class="panel-title">v1.0</span>
+            </div>
+            <div class="panel-body">
+              <div class="meter">
+                <div class="meter-bar" style="--w: 88%"></div>
+                <div class="meter-bar" style="--w: 63%"></div>
+                <div class="meter-bar" style="--w: 74%"></div>
+                <div class="meter-bar" style="--w: 49%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-scanline" aria-hidden="true"></div>
+    </section>
+
+    <section id="music" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Music</h2>
+        </div>
+        <div id="musicGrid" class="grid"></div>
+        <div class="links-row">
+          <a class="link" href="https://soundcloud.com/rgbelasco" target="_blank" rel="noreferrer">SoundCloud</a>
+          <span class="sep">•</span>
+          <a class="link" href="https://androidacid.bandcamp.com" target="_blank" rel="noreferrer">BandCamp</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="software" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Software</h2>
+        </div>
+        <div id="softwareGrid" class="grid"></div>
+      </div>
+    </section>
+
+    <section id="studio" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Studio</h2>
+        </div>
+        <div id="gallery" class="gallery"></div>
+      </div>
+    </section>
+
+    <section id="contact" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Contact</h2>
+        </div>
+        <div class="contact-grid">
+          <div class="card">
+            <h3>Reach me</h3>
+            <p class="muted">For releases, licensing, collabs, and audio tool questions.</p>
+            <ul class="list">
+              <li><span class="k">SoundCloud</span> <a class="link" href="https://soundcloud.com/rgbelasco" target="_blank" rel="noreferrer">/rgbelasco</a></li>
+              <li><span class="k">YouTube</span> <a class="link" href="https://www.youtube.com/@AndroidAcid">@AndroidAcid</a></li>
+              <li><span class="k">GitHub</span> <a class="link" href="https://github.com/YOUR_USERNAME" target="_blank" rel="noreferrer">@AndroidAcid</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="muted small">© <span id="year"></span> Android Acid</div>
+      <div class="muted small">Built for GitHub Pages • Neon responsibly</div>
+      <!-- Buy Me a Coffee — footer -->
+      <div class="footer-bmc">
+        <a class="bmc-btn" href="https://buymeacoffee.com/androidacid" target="_blank" rel="noreferrer" aria-label="Buy me a coffee">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M20.216 6.415l-.132-.666c-.119-.598-.388-1.163-1.001-1.379-.197-.069-.42-.098-.57-.241-.152-.143-.196-.366-.231-.572-.065-.378-.125-.756-.192-1.133-.057-.325-.102-.69-.25-.987-.195-.4-.597-.634-.996-.788a5.723 5.723 0 00-.626-.194c-1.559-.4-3.291-.27-4.677.054-1.228.28-2.473.72-3.445 1.472C7.266 2.637 6.99 3.410 7 4.19c.01.943.396 1.870 1.105 2.444.251.203.542.378.86.4.316.022.642-.04.886-.234C10.208 6.499 10.625 6 11.277 6c.674 0 1.007.462 1.607.462.589 0 .916-.462 1.607-.462.674 0 1.007.462 1.607.462.589 0 .879-.386 1.5-.462.624-.077.944.308 1.277.462" fill="#000"/>
+            <path d="M5 8.5c-.828 0-1.5.672-1.5 1.5v4.5c0 2.485 2.015 4.5 4.5 4.5h8c2.485 0 4.5-2.015 4.5-4.5V10c0-.828-.672-1.5-1.5-1.5H5z" fill="#000"/>
+            <path d="M18.5 8.5H20c1.105 0 2 .895 2 2v1c0 1.105-.895 2-2 2h-1.5" stroke="#000" stroke-width="1.5"/>
+          </svg>
+          Buy me a coffee
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>
